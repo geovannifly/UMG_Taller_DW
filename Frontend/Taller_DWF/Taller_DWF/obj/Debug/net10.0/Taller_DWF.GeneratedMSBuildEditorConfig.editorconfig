@@ -1,0 +1,210 @@
+is_global = true
+build_property.EnableAotAnalyzer = 
+build_property.EnableSingleFileAnalyzer = 
+build_property.EnableTrimAnalyzer = false
+build_property.IncludeAllContentForSelfExtract = 
+build_property.VerifyReferenceTrimCompatibility = 
+build_property.VerifyReferenceAotCompatibility = 
+build_property.TargetFramework = net10.0
+build_property.TargetFrameworkIdentifier = .NETCoreApp
+build_property.TargetFrameworkVersion = v10.0
+build_property.TargetPlatformMinVersion = 
+build_property.UsingMicrosoftNETSdkWeb = 
+build_property.ProjectTypeGuids = 
+build_property.InvariantGlobalization = false
+build_property.PlatformNeutralAssembly = 
+build_property.EnforceExtendedAnalyzerRules = 
+build_property.EntryPointFilePath = 
+build_property._SupportedPlatformList = browser
+build_property.RootNamespace = Taller_DWF
+build_property.RootNamespace = Taller_DWF
+build_property.ProjectDir = C:\Users\cpere\Downloads\proyecto2_DW\Frontend\Taller_DWF\Taller_DWF\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = false
+build_property.RazorLangVersion = 10.0
+build_property.SupportLocalizedComponentNames = 
+build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+build_property.MSBuildProjectDirectory = C:\Users\cpere\Downloads\proyecto2_DW\Frontend\Taller_DWF\Taller_DWF
+build_property._RazorSourceGeneratorDebug = 
+build_property.EffectiveAnalysisLevelStyle = 10.0
+build_property.EnableCodeStyleSeverity = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/App.razor]
+build_metadata.AdditionalFiles.TargetPath = QXBwLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/BarraStock.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xCYXJyYVN0b2NrLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/Cargando.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xDYXJnYW5kby5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/DialogoHost.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xEaWFsb2dvSG9zdC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/Encabezado.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xFbmNhYmV6YWRvLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/EstadoOrden.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xFc3RhZG9PcmRlbi5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/EstadoVacio.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xFc3RhZG9WYWNpby5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/FlujoOrden.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xGbHVqb09yZGVuLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/Formularios/ClienteFormModal.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xGb3JtdWxhcmlvc1xDbGllbnRlRm9ybU1vZGFsLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/Formularios/DiagnosticoModal.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xGb3JtdWxhcmlvc1xEaWFnbm9zdGljb01vZGFsLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/Formularios/SolicitarRepuestoModal.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xGb3JtdWxhcmlvc1xTb2xpY2l0YXJSZXB1ZXN0b01vZGFsLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/Formularios/VehiculoFormModal.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xGb3JtdWxhcmlvc1xWZWhpY3Vsb0Zvcm1Nb2RhbC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/Insignia.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xJbnNpZ25pYS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/Kpi.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xLcGkucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/LogoTaller.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMb2dvVGFsbGVyLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/Modal.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xNb2RhbC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/Protegido.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQcm90ZWdpZG8ucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/RedirigirLogin.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xSZWRpcmlnaXJMb2dpbi5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/TablaMovimientos.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xUYWJsYU1vdmltaWVudG9zLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Components/ToastHost.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xUb2FzdEhvc3QucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Layout/LayoutVacio.razor]
+build_metadata.AdditionalFiles.TargetPath = TGF5b3V0XExheW91dFZhY2lvLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Layout/MainLayout.razor]
+build_metadata.AdditionalFiles.TargetPath = TGF5b3V0XE1haW5MYXlvdXQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Administracion/Bitacora.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5pc3RyYWNpb25cQml0YWNvcmEucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Administracion/Parametros.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5pc3RyYWNpb25cUGFyYW1ldHJvcy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Administracion/Roles.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5pc3RyYWNpb25cUm9sZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Administracion/Usuarios.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5pc3RyYWNpb25cVXN1YXJpb3MucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Clientes/ClienteDetalle.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ2xpZW50ZXNcQ2xpZW50ZURldGFsbGUucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Clientes/Clientes.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ2xpZW50ZXNcQ2xpZW50ZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Despachos/Despachos.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRGVzcGFjaG9zXERlc3BhY2hvcy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Facturacion/Facturacion.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRmFjdHVyYWNpb25cRmFjdHVyYWNpb24ucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Facturacion/FacturaDetalle.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRmFjdHVyYWNpb25cRmFjdHVyYURldGFsbGUucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Facturacion/NuevaFactura.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRmFjdHVyYWNpb25cTnVldmFGYWN0dXJhLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Inicio.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSW5pY2lvLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Inventario/Inventario.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSW52ZW50YXJpb1xJbnZlbnRhcmlvLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Login.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTG9naW4ucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/NotFound.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTm90Rm91bmQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Ordenes/NuevaOrden.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcT3JkZW5lc1xOdWV2YU9yZGVuLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Ordenes/OrdenDetalle.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcT3JkZW5lc1xPcmRlbkRldGFsbGUucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Ordenes/Ordenes.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcT3JkZW5lc1xPcmRlbmVzLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Reparaciones/Tablero.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUmVwYXJhY2lvbmVzXFRhYmxlcm8ucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Solicitudes/Solicitudes.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU29saWNpdHVkZXNcU29saWNpdHVkZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Vehiculos/VehiculoDetalle.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVmVoaWN1bG9zXFZlaGljdWxvRGV0YWxsZS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/Vehiculos/Vehiculos.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVmVoaWN1bG9zXFZlaGljdWxvcy5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/Pages/_Imports.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX0ltcG9ydHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/cpere/Downloads/proyecto2_DW/Frontend/Taller_DWF/Taller_DWF/_Imports.razor]
+build_metadata.AdditionalFiles.TargetPath = X0ltcG9ydHMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 

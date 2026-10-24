@@ -1,0 +1,79 @@
+@page "/administracion/parametros"
+@inject ParametrosApi Api
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+
+<PageTitle>Parámetros · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Parametros">
+    <Encabezado Icono="bi-sliders" Titulo="Parámetros del taller" Subtitulo="Datos de la empresa y reglas usadas en la facturación" />
+
+    @if (parametros is null)
+    {
+        <Cargando />
+    }
+    else
+    {
+        <div class="td-card">
+            <ul class="td-lista-simple">
+                @foreach (var p in parametros)
+                {
+                    <li class="flex-wrap">
+                        <div class="td-avatar oscuro"><i class="bi @(p.Tipo == "NUMERO" ? "bi-123" : "bi-fonts")"></i></div>
+                        <div class="flex-grow-1" style="min-width:200px">
+                            <div class="fw-semibold">@p.Descripcion</div>
+                            <div class="small"><span class="td-codigo">@p.Clave</span></div>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center" style="min-width:300px;flex:1;max-width:460px">
+                            <input class="form-control" value="@valores[p.ParametroId]" disabled="@(!PuedeEditar)"
+                                   @oninput="e => valores[p.ParametroId] = e.Value?.ToString() ?? string.Empty"
+                                   inputmode="@(p.Tipo == "NUMERO" ? "decimal" : "text")" />
+                            @if (PuedeEditar)
+                            {
+                                <button class="btn btn-primary btn-sm" disabled="@(valores[p.ParametroId] == p.Valor || ocupado)" @onclick="() => Guardar(p)">
+                                    <i class="bi bi-check2"></i>
+                                </button>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+</Protegido>
+
+@code {
+    private List<ParametroDto>? parametros;
+    private Dictionary<int, string> valores = [];
+    private bool ocupado;
+
+    private bool PuedeEditar => Sesion.Puede(Modulos.Parametros, Accion.Editar);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            parametros = await Api.ListarAsync();
+            valores = parametros.ToDictionary(p => p.ParametroId, p => p.Valor);
+        }
+        catch (ApiException ex)
+        {
+            parametros = [];
+            Notificaciones.Error(ex.Message);
+        }
+    }
+
+    private async Task Guardar(ParametroDto p)
+    {
+        ocupado = true;
+        try
+        {
+            var actualizado = await Api.ActualizarAsync(p.ParametroId, valores[p.ParametroId]);
+            parametros![parametros.IndexOf(p)] = actualizado;
+            valores[p.ParametroId] = actualizado.Valor;
+            Notificaciones.Exito($"{p.Descripcion}: guardado.");
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+}

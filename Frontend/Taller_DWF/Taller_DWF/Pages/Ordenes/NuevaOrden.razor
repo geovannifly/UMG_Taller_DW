@@ -1,0 +1,254 @@
+@page "/ordenes/nueva"
+@inject OrdenesApi Ordenes
+@inject VehiculosApi Vehiculos
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject NavigationManager Navegacion
+
+<PageTitle>Recibir vehículo · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Ordenes" Accion="Accion.Crear">
+    <Encabezado Icono="bi-box-arrow-in-down" Titulo="Recibir vehículo" Subtitulo="Registre el ingreso del vehículo y abra su orden de trabajo" Volver="ordenes" />
+
+    <div class="row g-3">
+        <div class="col-lg-5">
+            <div class="td-card h-100">
+                <div class="td-card-cabecera">
+                    <h2><span class="td-avatar sm">1</span> Vehículo</h2>
+                    @if (vehiculo is null)
+                    {
+                        <div class="d-flex gap-1">
+                            @if (Sesion.Puede(Modulos.Clientes, Accion.Crear))
+                            {
+                                <button class="btn btn-light btn-sm" @onclick="() => modalCliente = true"><i class="bi bi-person-plus"></i> Cliente</button>
+                            }
+                            @if (Sesion.Puede(Modulos.Vehiculos, Accion.Crear))
+                            {
+                                <button class="btn btn-light btn-sm" @onclick="() => { clienteNuevoId = null; modalVehiculo = true; }"><i class="bi bi-plus-lg"></i> Vehículo</button>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="td-card-cuerpo">
+                    @if (vehiculo is not null)
+                    {
+                        <div class="td-opcion activo">
+                            <div class="td-avatar oscuro"><i class="bi bi-car-front-fill"></i></div>
+                            <div class="flex-grow-1">
+                                <span class="td-placa">@vehiculo.Placa</span>
+                                <div class="fw-bold mt-1">@vehiculo.Marca @vehiculo.Modelo @vehiculo.Anio</div>
+                                <div class="small text-sec"><i class="bi bi-person"></i> @vehiculo.Cliente</div>
+                            </div>
+                            <button class="btn btn-light btn-sm" @onclick="() => Seleccionar(null)">Cambiar</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="input-icono mb-3">
+                            <i class="bi bi-search"></i>
+                            <input class="form-control" placeholder="Placa, marca o nombre del cliente..." @bind="buscar" @bind:event="oninput" @bind:after="BuscarConPausa" />
+                        </div>
+                        @if (resultados is null)
+                        {
+                            <Cargando />
+                        }
+                        else if (resultados.Count == 0)
+                        {
+                            <EstadoVacio Icono="bi-car-front" Titulo="No se encontró el vehículo" Mensaje="Regístrelo con el botón «Vehículo» (o registre primero al cliente)." />
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column gap-2" style="max-height:440px;overflow-y:auto">
+                                @foreach (var v in resultados)
+                                {
+                                    <button class="td-opcion" disabled="@v.TieneOrdenActiva" style="@(v.TieneOrdenActiva ? "opacity:.55" : "")" @onclick="() => Seleccionar(v)">
+                                        <span class="td-placa">@v.Placa</span>
+                                        <div class="flex-grow-1 min-w-0">
+                                            <div class="fw-semibold text-truncate">@v.Marca @v.Modelo @v.Anio</div>
+                                            <div class="small text-ter text-truncate">@v.Cliente</div>
+                                        </div>
+                                        @if (v.TieneOrdenActiva) { <Insignia Clase="est-reparacion" Texto="En taller" /> }
+                                    </button>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="td-card">
+                <div class="td-card-cabecera"><h2><span class="td-avatar sm">2</span> Datos de ingreso</h2></div>
+                <EditForm Model="form" OnValidSubmit="Registrar">
+                    <DataAnnotationsValidator />
+                    <div class="td-card-cuerpo">
+                        <div class="row g-3">
+                            <div class="col-md-5">
+                                <label class="form-label">Kilometraje *</label>
+                                <div class="input-group">
+                                    <InputNumber class="form-control" @bind-Value="form.Kilometraje" />
+                                    <span class="input-group-text">km</span>
+                                </div>
+                                <ValidationMessage For="() => form.Kilometraje" />
+                            </div>
+                            <div class="col-md-7">
+                                <label class="form-label">Nivel de combustible</label>
+                                <div class="td-combustible">
+                                    @foreach (var n in new[] { "Reserva", "1/4", "1/2", "3/4", "Lleno" })
+                                    {
+                                        <button type="button" class="@(form.NivelCombustible == n ? "activo" : "")" @onclick="() => form.NivelCombustible = n">@n</button>
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Motivo de ingreso *</label>
+                                <InputTextArea class="form-control" rows="3" @bind-Value="form.MotivoIngreso" placeholder="¿Qué reporta el cliente? Ej.: ruido al frenar, revisión de 50,000 km..." />
+                                <ValidationMessage For="() => form.MotivoIngreso" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Observaciones de recepción</label>
+                                <InputTextArea class="form-control" rows="2" @bind-Value="form.Observaciones" placeholder="Golpes visibles, objetos de valor, accesorios..." />
+                            </div>
+                            <div class="col-md-7">
+                                <label class="form-label">Prioridad</label>
+                                <div class="td-combustible">
+                                    @foreach (var p in new[] { "BAJA", "NORMAL", "ALTA", "URGENTE" })
+                                    {
+                                        <button type="button" class="@(form.Prioridad == p ? "activo" : "")" @onclick="() => form.Prioridad = p">@Ui.Prioridad(p)</button>
+                                    }
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label">Entrega estimada</label>
+                                <InputDate class="form-control" @bind-Value="form.FechaEstimada" min="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Asignar mecánico <span class="text-ter fw-normal">(opcional, puede hacerse después)</span></label>
+                                <div class="row g-2">
+                                    @foreach (var m in mecanicos)
+                                    {
+                                        <div class="col-sm-6">
+                                            <button type="button" class="td-opcion @(form.MecanicoId == m.UsuarioId ? "activo" : "")"
+                                                    @onclick="() => form.MecanicoId = form.MecanicoId == m.UsuarioId ? null : m.UsuarioId">
+                                                <span class="td-avatar sm oscuro">@Ui.Iniciales(m.NombreCompleto)</span>
+                                                <div class="flex-grow-1">
+                                                    <div class="fw-semibold small">@m.NombreCompleto</div>
+                                                    <div class="small text-ter">@m.TrabajosActivos trabajo(s) activo(s)</div>
+                                                </div>
+                                                @if (form.MecanicoId == m.UsuarioId) { <i class="bi bi-check-circle-fill"></i> }
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="td-modal-pie" style="border-radius:0 0 var(--td-radio) var(--td-radio)">
+                        <a class="btn btn-light" href="ordenes">Cancelar</a>
+                        <button type="submit" class="btn btn-primary" disabled="@(vehiculo is null || guardando)">
+                            <i class="bi bi-clipboard-plus"></i> Abrir orden de trabajo
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+
+    <ClienteFormModal Visible="modalCliente" OnCerrar="() => modalCliente = false" OnGuardado="ClienteCreado" />
+    <VehiculoFormModal Visible="modalVehiculo" ClienteIdFijo="clienteNuevoId" OnCerrar="() => modalVehiculo = false" OnGuardado="VehiculoCreado" />
+</Protegido>
+
+@code {
+    [SupplyParameterFromQuery(Name = "vehiculo")] public int? VehiculoInicial { get; set; }
+
+    private readonly OrdenCrearRequest form = new() { NivelCombustible = "1/2" };
+    private VehiculoDto? vehiculo;
+    private List<VehiculoDto>? resultados;
+    private List<MecanicoDisponibleDto> mecanicos = [];
+    private string? buscar;
+    private bool guardando;
+    private bool modalCliente;
+    private bool modalVehiculo;
+    private int? clienteNuevoId;
+    private CancellationTokenSource? pausa;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var tareaMecanicos = Ordenes.MecanicosAsync();
+            if (VehiculoInicial.HasValue)
+            {
+                var v = (await Vehiculos.ObtenerAsync(VehiculoInicial.Value)).Vehiculo;
+                if (!v.TieneOrdenActiva) Seleccionar(v);
+            }
+            await Buscar();
+            mecanicos = await tareaMecanicos;
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+            resultados ??= [];
+        }
+    }
+
+    private async Task Buscar()
+    {
+        try { resultados = (await Vehiculos.ListarAsync(buscar)).Take(30).ToList(); }
+        catch (ApiException ex) { resultados = []; Notificaciones.Error(ex.Message); }
+    }
+
+    private async Task BuscarConPausa()
+    {
+        pausa?.Cancel();
+        pausa = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, pausa.Token);
+            await Buscar();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private void ClienteCreado(ClienteDto cliente)
+    {
+        // Después de registrar al cliente, se registra su vehículo
+        modalCliente = false;
+        clienteNuevoId = cliente.ClienteId;
+        modalVehiculo = true;
+    }
+
+    private void VehiculoCreado(VehiculoDto nuevo)
+    {
+        modalVehiculo = false;
+        Seleccionar(nuevo);
+    }
+
+    private void Seleccionar(VehiculoDto? v)
+    {
+        vehiculo = v;
+        form.VehiculoId = v?.VehiculoId ?? 0;
+    }
+
+    private async Task Registrar()
+    {
+        if (vehiculo is null) return;
+
+        guardando = true;
+        try
+        {
+            var orden = await Ordenes.CrearAsync(form);
+            Notificaciones.Exito($"Orden {orden.NumeroOrden} abierta para {vehiculo.Placa}.");
+            Navegacion.NavigateTo($"ordenes/{orden.OrdenId}");
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+}

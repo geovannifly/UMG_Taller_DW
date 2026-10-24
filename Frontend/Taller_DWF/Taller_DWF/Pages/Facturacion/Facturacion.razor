@@ -1,0 +1,130 @@
+@page "/facturacion"
+@inject FacturasApi Api
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject NavigationManager Navegacion
+
+<PageTitle>Facturación · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Facturacion">
+    <Encabezado Icono="bi-receipt" Titulo="Facturación" Subtitulo="Cobro de los trabajos terminados y control de facturas" />
+
+    <div class="td-card">
+        <div class="td-tabs">
+            <button class="td-tab @(tab == "pendientes" ? "activo" : "")" @onclick="@(() => tab = "pendientes")">
+                <i class="bi bi-hourglass"></i> Por facturar <span class="cuenta">@(porFacturar?.Count ?? 0)</span>
+            </button>
+            <button class="td-tab @(tab == "emitidas" ? "activo" : "")" @onclick="@(() => tab = "emitidas")">
+                <i class="bi bi-receipt-cutoff"></i> Facturas
+            </button>
+        </div>
+
+        @if (tab == "pendientes")
+        {
+            @if (porFacturar is null)
+            {
+                <Cargando />
+            }
+            else if (porFacturar.Count == 0)
+            {
+                <EstadoVacio Icono="bi-check2-all" Titulo="No hay trabajos por facturar" Mensaje="Las órdenes aparecen aquí cuando el mecánico finaliza la reparación." />
+            }
+            else
+            {
+                <ul class="td-lista-simple">
+                    @foreach (var o in porFacturar)
+                    {
+                        <li>
+                            <span class="td-placa">@o.Placa</span>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="fw-semibold">@o.Cliente</div>
+                                <div class="small text-ter text-truncate">@o.NumeroOrden · @o.Vehiculo · @o.MotivoIngreso</div>
+                            </div>
+                            <a class="btn btn-light btn-sm" href="ordenes/@o.OrdenId">Ver orden</a>
+                            @if (Sesion.Puede(Modulos.Facturacion, Accion.Crear))
+                            {
+                                <a class="btn btn-primary btn-sm" href="facturacion/nueva/@o.OrdenId"><i class="bi bi-receipt"></i> Facturar</a>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        }
+        else
+        {
+            <div class="td-barra">
+                <div class="input-icono">
+                    <i class="bi bi-search"></i>
+                    <input class="form-control" placeholder="Número, NIT, cliente, orden o placa..." @bind="buscar" @bind:event="oninput" />
+                </div>
+                <select class="form-select w-auto" @bind="estado">
+                    <option value="">Todas</option>
+                    <option value="EMITIDA">Emitidas</option>
+                    <option value="ANULADA">Anuladas</option>
+                </select>
+                <span class="ms-auto fw-semibold">Total emitido: <span class="tnum">@Ui.Moneda(Filtradas.Where(f => f.Estado == "EMITIDA").Sum(f => f.Total))</span></span>
+            </div>
+            @if (facturas is null)
+            {
+                <Cargando />
+            }
+            else if (!Filtradas.Any())
+            {
+                <EstadoVacio Icono="bi-receipt" Titulo="No hay facturas que mostrar" />
+            }
+            else
+            {
+                <div class="td-tabla-contenedor">
+                    <table class="td-tabla">
+                        <thead><tr><th>Factura</th><th>Cliente</th><th>Orden</th><th>Pago</th><th class="text-end">Total</th><th>Estado</th></tr></thead>
+                        <tbody>
+                            @foreach (var f in Filtradas)
+                            {
+                                <tr class="clic @(f.Estado == "ANULADA" ? "inactivo" : "")" @onclick="@(() => Navegacion.NavigateTo($"facturacion/{f.FacturaId}"))">
+                                    <td><div class="td-celda-principal">@f.NumeroFactura</div><div class="td-celda-sub">@Ui.FechaHora(f.FechaEmision)</div></td>
+                                    <td><div>@f.NombreCliente</div><div class="td-celda-sub">NIT @f.NitCliente</div></td>
+                                    <td class="small">@f.NumeroOrden</td>
+                                    <td class="small">@Ui.MetodoPago(f.MetodoPago)</td>
+                                    <td class="text-end fw-bold tnum">@Ui.Moneda(f.Total)</td>
+                                    <td><Insignia Clase="@(f.Estado == "EMITIDA" ? "est-listo" : "est-cancelado")" Texto="@(f.Estado == "EMITIDA" ? "Emitida" : "Anulada")" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    </div>
+</Protegido>
+
+@code {
+    [SupplyParameterFromQuery(Name = "tab")] public string? TabInicial { get; set; }
+
+    private string tab = "pendientes";
+    private List<OrdenResumenDto>? porFacturar;
+    private List<FacturaResumenDto>? facturas;
+    private string? buscar;
+    private string estado = "";
+
+    private IEnumerable<FacturaResumenDto> Filtradas => (facturas ?? [])
+        .Where(f => estado == "" || f.Estado == estado)
+        .Where(f => string.IsNullOrWhiteSpace(buscar)
+                    || $"{f.NumeroFactura} {f.NitCliente} {f.NombreCliente} {f.NumeroOrden}".Contains(buscar.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (TabInicial == "emitidas") tab = "emitidas";
+        try
+        {
+            var pendientes = Api.PorFacturarAsync();
+            facturas = await Api.ListarAsync();
+            porFacturar = await pendientes;
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+            porFacturar ??= [];
+            facturas ??= [];
+        }
+    }
+}

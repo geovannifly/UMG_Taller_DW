@@ -1,0 +1,37 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\cpere\\Downloads\\proyecto2_DW\\Backend\\Talle_DW\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{E5138713-957C-9958-165E-263C4E24A2C1}|Talle_DW\\Talle_DW.csproj|c:\\users\\cpere\\downloads\\proyecto2_dw\\backend\\talle_dw\\talle_dw\\properties\\launchsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{E5138713-957C-9958-165E-263C4E24A2C1}|Talle_DW\\Talle_DW.csproj|solutionrelative:talle_dw\\properties\\launchsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "launchSettings.json",
+              "DocumentMoniker": "C:\\Users\\cpere\\Downloads\\proyecto2_DW\\Backend\\Talle_DW\\Talle_DW\\Properties\\launchSettings.json",
+              "RelativeDocumentMoniker": "Talle_DW\\Properties\\launchSettings.json",
+              "ToolTip": "C:\\Users\\cpere\\Downloads\\proyecto2_DW\\Backend\\Talle_DW\\Talle_DW\\Properties\\launchSettings.json",
+              "RelativeToolTip": "Talle_DW\\Properties\\launchSettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-10-24T04:01:28.928Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

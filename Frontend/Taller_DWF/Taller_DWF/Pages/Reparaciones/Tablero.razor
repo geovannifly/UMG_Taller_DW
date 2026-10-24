@@ -1,0 +1,101 @@
+@page "/reparaciones"
+@inject ReparacionesApi Api
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+
+<PageTitle>Reparaciones · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Reparaciones">
+    <Encabezado Icono="bi-kanban" Titulo="Tablero de trabajos" Subtitulo="Vehículos en proceso agrupados por etapa, ordenados por prioridad">
+        @if (PuedeVerTodo)
+        {
+            <div class="td-segmento">
+                <button class="@(soloMias ? "activo" : "")" @onclick="() => Cambiar(true)"><i class="bi bi-person"></i> Mis trabajos</button>
+                <button class="@(!soloMias ? "activo" : "")" @onclick="() => Cambiar(false)"><i class="bi bi-people"></i> Todo el taller</button>
+            </div>
+        }
+        <button class="btn btn-light btn-icono" title="Actualizar" @onclick="Cargar"><i class="bi bi-arrow-clockwise"></i></button>
+    </Encabezado>
+
+    @if (columnas is null)
+    {
+        <Cargando />
+    }
+    else if (columnas.All(c => c.Ordenes.Count == 0))
+    {
+        <div class="td-card">
+            <EstadoVacio Icono="bi-cup-hot" Titulo="@(soloMias ? "No tiene trabajos asignados" : "No hay vehículos en proceso")"
+                         Mensaje="Cuando Recepción le asigne una orden, aparecerá aquí." />
+        </div>
+    }
+    else
+    {
+        <div class="td-tablero">
+            @foreach (var col in columnas)
+            {
+                <section class="td-columna">
+                    <div class="td-columna-cabecera">
+                        <span class="d-flex align-items-center gap-2"><i class="bi @Ui.IconoEstadoOrden(col.Estado)"></i> @col.Descripcion</span>
+                        <span class="cuenta">@col.Ordenes.Count</span>
+                    </div>
+                    @foreach (var o in col.Ordenes)
+                    {
+                        <a class="td-tarjeta-orden" href="ordenes/@o.OrdenId">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="td-placa">@o.Placa</span>
+                                <Insignia Clase="@Ui.ClasePrioridad(o.Prioridad)" Texto="@Ui.Prioridad(o.Prioridad)" SinPunto="true" />
+                            </div>
+                            <div class="fw-bold mt-2">@o.Vehiculo</div>
+                            <div class="motivo">@o.MotivoIngreso</div>
+                            <div class="d-flex justify-content-between align-items-center small text-ter">
+                                <span>@o.NumeroOrden</span>
+                                @if (!soloMias && o.Mecanico is not null)
+                                {
+                                    <span class="d-flex align-items-center gap-1"><span class="td-avatar sm oscuro">@Ui.Iniciales(o.Mecanico)</span></span>
+                                }
+                                else
+                                {
+                                    <span><i class="bi bi-clock"></i> @Ui.TiempoTranscurrido(o.FechaIngreso)</span>
+                                }
+                            </div>
+                        </a>
+                    }
+                </section>
+            }
+        </div>
+    }
+</Protegido>
+
+@code {
+    private List<ColumnaTableroDto>? columnas;
+    private bool soloMias = true;
+
+    // Quien no repara (p. ej. administrador o recepción) ve todo el taller por defecto
+    private bool PuedeVerTodo => Sesion.Puede(Modulos.Ordenes);
+
+    protected override async Task OnInitializedAsync()
+    {
+        soloMias = Sesion.Puede(Modulos.Diagnosticos, Accion.Crear) && !(Sesion.Perfil?.EsAdministrador ?? false);
+        await Cargar();
+    }
+
+    private async Task Cambiar(bool mias)
+    {
+        soloMias = mias;
+        columnas = null;
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        try
+        {
+            columnas = await Api.TableroAsync(soloMias);
+        }
+        catch (ApiException ex)
+        {
+            columnas = [];
+            Notificaciones.Error(ex.Message);
+        }
+    }
+}

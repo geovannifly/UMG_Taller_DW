@@ -1,0 +1,141 @@
+@page "/clientes/{Id:int}"
+@inject ClientesApi Api
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject NavigationManager Navegacion
+
+<PageTitle>Cliente · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Clientes">
+    @if (detalle is null)
+    {
+        <Cargando />
+    }
+    else
+    {
+        var c = detalle.Cliente;
+        <Encabezado Icono="bi-person-vcard" Titulo="@c.NombreCompleto" Subtitulo="@($"Cliente desde {Ui.Fecha(c.FechaRegistro)}")" Volver="clientes">
+            @if (Sesion.Puede(Modulos.Clientes, Accion.Editar))
+            {
+                <button class="btn btn-light" @onclick="() => modalCliente = true"><i class="bi bi-pencil"></i> Editar</button>
+            }
+            @if (Sesion.Puede(Modulos.Vehiculos, Accion.Crear) && c.Activo)
+            {
+                <button class="btn btn-primary" @onclick="() => modalVehiculo = true"><i class="bi bi-plus-lg"></i> Agregar vehículo</button>
+            }
+        </Encabezado>
+
+        <div class="row g-3">
+            <div class="col-lg-4">
+                <div class="td-card">
+                    <div class="td-card-cabecera"><h2><i class="bi bi-info-circle"></i> Datos del cliente</h2>
+                        <Insignia Clase="@(c.Activo ? "est-listo" : "est-cancelado")" Texto="@(c.Activo ? "Activo" : "Inactivo")" />
+                    </div>
+                    <div class="td-card-cuerpo">
+                        <div class="td-datos" style="grid-template-columns:1fr 1fr">
+                            <div class="td-dato"><div class="etq">NIT</div><div class="val">@c.Nit</div></div>
+                            <div class="td-dato"><div class="etq">DPI</div><div class="val">@(c.Dpi ?? "—")</div></div>
+                            <div class="td-dato"><div class="etq">Teléfono</div><div class="val">@c.Telefono</div></div>
+                            <div class="td-dato"><div class="etq">Vehículos</div><div class="val">@c.CantidadVehiculos</div></div>
+                            <div class="td-dato" style="grid-column:1/-1"><div class="etq">Correo</div><div class="val text-break">@(c.Correo ?? "—")</div></div>
+                            <div class="td-dato" style="grid-column:1/-1"><div class="etq">Dirección</div><div class="val">@(c.Direccion ?? "—")</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                <div class="td-card mb-3">
+                    <div class="td-card-cabecera"><h2><i class="bi bi-car-front"></i> Vehículos</h2></div>
+                    @if (detalle.Vehiculos.Count == 0)
+                    {
+                        <EstadoVacio Icono="bi-car-front" Titulo="Sin vehículos registrados" Mensaje="Agregue el vehículo del cliente para poder recibirlo en el taller." />
+                    }
+                    else
+                    {
+                        <ul class="td-lista-simple">
+                            @foreach (var v in detalle.Vehiculos)
+                            {
+                                <li>
+                                    <span class="td-placa">@v.Placa</span>
+                                    <div class="flex-grow-1">
+                                        <a href="vehiculos/@v.VehiculoId" class="fw-semibold">@v.Marca @v.Modelo @v.Anio</a>
+                                        <div class="small text-ter">@(v.Color ?? "Color no indicado")</div>
+                                    </div>
+                                    @if (v.TieneOrdenActiva)
+                                    {
+                                        <Insignia Clase="est-reparacion" Texto="En taller" />
+                                    }
+                                    else if (Sesion.Puede(Modulos.Ordenes, Accion.Crear) && v.Activo)
+                                    {
+                                        <a class="btn btn-light btn-sm" href="ordenes/nueva?vehiculo=@v.VehiculoId"><i class="bi bi-box-arrow-in-down"></i> Recibir</a>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+
+                <div class="td-card">
+                    <div class="td-card-cabecera"><h2><i class="bi bi-clock-history"></i> Historial de servicios</h2></div>
+                    @if (detalle.Ordenes.Count == 0)
+                    {
+                        <EstadoVacio Icono="bi-clipboard" Titulo="Sin servicios todavía" />
+                    }
+                    else
+                    {
+                        <div class="td-tabla-contenedor">
+                            <table class="td-tabla">
+                                <thead><tr><th>Orden</th><th>Vehículo</th><th>Motivo</th><th>Estado</th></tr></thead>
+                                <tbody>
+                                    @foreach (var o in detalle.Ordenes)
+                                    {
+                                        <tr class="clic" @onclick="@(() => Navegacion.NavigateTo($"ordenes/{o.OrdenId}"))">
+                                            <td><div class="td-celda-principal">@o.NumeroOrden</div><div class="td-celda-sub">@Ui.Fecha(o.FechaIngreso)</div></td>
+                                            <td><span class="td-placa">@o.Placa</span></td>
+                                            <td class="small text-sec">@o.MotivoIngreso</td>
+                                            <td><EstadoOrden Estado="@o.Estado" /></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <ClienteFormModal Visible="modalCliente" Cliente="c" OnCerrar="() => modalCliente = false" OnGuardado="Recargar" />
+        <VehiculoFormModal Visible="modalVehiculo" ClienteIdFijo="c.ClienteId" OnCerrar="() => modalVehiculo = false" OnGuardado="Recargar" />
+    }
+</Protegido>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private ClienteDetalleDto? detalle;
+    private bool modalCliente;
+    private bool modalVehiculo;
+
+    protected override Task OnParametersSetAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        try
+        {
+            detalle = await Api.ObtenerAsync(Id);
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+            Navegacion.NavigateTo("clientes");
+        }
+    }
+
+    private async Task Recargar()
+    {
+        modalCliente = false;
+        modalVehiculo = false;
+        await Cargar();
+    }
+}

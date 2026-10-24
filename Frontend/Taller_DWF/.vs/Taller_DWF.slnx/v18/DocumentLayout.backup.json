@@ -1,0 +1,37 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\cpere\\Downloads\\proyecto2_DW\\Frontend\\Taller_DWF\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{374D1E7F-08A6-84EB-9B74-E5FFA4725540}|Taller_DWF\\Taller_DWF.csproj|c:\\users\\cpere\\downloads\\proyecto2_dw\\frontend\\taller_dwf\\taller_dwf\\properties\\launchsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{374D1E7F-08A6-84EB-9B74-E5FFA4725540}|Taller_DWF\\Taller_DWF.csproj|solutionrelative:taller_dwf\\properties\\launchsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "launchSettings.json",
+              "DocumentMoniker": "C:\\Users\\cpere\\Downloads\\proyecto2_DW\\Frontend\\Taller_DWF\\Taller_DWF\\Properties\\launchSettings.json",
+              "RelativeDocumentMoniker": "Taller_DWF\\Properties\\launchSettings.json",
+              "ToolTip": "C:\\Users\\cpere\\Downloads\\proyecto2_DW\\Frontend\\Taller_DWF\\Taller_DWF\\Properties\\launchSettings.json",
+              "RelativeToolTip": "Taller_DWF\\Properties\\launchSettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-10-24T04:00:20.005Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

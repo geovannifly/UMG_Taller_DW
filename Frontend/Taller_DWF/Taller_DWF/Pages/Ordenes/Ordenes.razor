@@ -1,0 +1,113 @@
+@page "/ordenes"
+@inject OrdenesApi Api
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject NavigationManager Navegacion
+
+<PageTitle>Órdenes de trabajo · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Ordenes">
+    <Encabezado Icono="bi-clipboard-check" Titulo="Órdenes de trabajo" Subtitulo="Seguimiento de cada vehículo desde su ingreso hasta la entrega">
+        @if (Sesion.Puede(Modulos.Ordenes, Accion.Crear))
+        {
+            <a class="btn btn-primary" href="ordenes/nueva"><i class="bi bi-box-arrow-in-down"></i> Recibir vehículo</a>
+        }
+    </Encabezado>
+
+    <div class="td-chips mb-3">
+        @foreach (var (clave, texto) in Filtros)
+        {
+            <button class="td-chip @(filtro == clave ? "activo" : "")" @onclick="() => filtro = clave">
+                @texto <span class="cuenta">@Contar(clave)</span>
+            </button>
+        }
+    </div>
+
+    <div class="td-card">
+        <div class="td-barra">
+            <div class="input-icono">
+                <i class="bi bi-search"></i>
+                <input class="form-control" placeholder="Buscar por número, placa, cliente o motivo..." @bind="buscar" @bind:event="oninput" />
+            </div>
+            <span class="ms-auto small text-ter">@Filtradas.Count() orden(es)</span>
+        </div>
+
+        @if (ordenes is null)
+        {
+            <Cargando />
+        }
+        else if (!Filtradas.Any())
+        {
+            <EstadoVacio Icono="bi-clipboard" Titulo="No hay órdenes en esta vista" />
+        }
+        else
+        {
+            <div class="td-tabla-contenedor">
+                <table class="td-tabla">
+                    <thead><tr><th>Orden</th><th>Vehículo</th><th>Cliente</th><th>Mecánico</th><th>Prioridad</th><th>Estado</th></tr></thead>
+                    <tbody>
+                        @foreach (var o in Filtradas)
+                        {
+                            <tr class="clic" @onclick="@(() => Navegacion.NavigateTo($"ordenes/{o.OrdenId}"))">
+                                <td><div class="td-celda-principal">@o.NumeroOrden</div><div class="td-celda-sub">@Ui.FechaHora(o.FechaIngreso)</div></td>
+                                <td><span class="td-placa">@o.Placa</span><div class="td-celda-sub mt-1">@o.Vehiculo</div></td>
+                                <td>@o.Cliente</td>
+                                <td>
+                                    @if (o.Mecanico is null) { <span class="small text-ter fst-italic">Sin asignar</span> }
+                                    else { <span class="d-inline-flex align-items-center gap-2"><span class="td-avatar sm oscuro">@Ui.Iniciales(o.Mecanico)</span><span class="small">@o.Mecanico</span></span> }
+                                </td>
+                                <td><Insignia Clase="@Ui.ClasePrioridad(o.Prioridad)" Texto="@Ui.Prioridad(o.Prioridad)" SinPunto="true" /></td>
+                                <td><EstadoOrden Estado="@o.Estado" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</Protegido>
+
+@code {
+    [SupplyParameterFromQuery(Name = "estado")] public string? EstadoInicial { get; set; }
+
+    private static readonly (string Clave, string Texto)[] Filtros =
+    [
+        ("ACTIVAS", "En taller"), ("RECIBIDO", "Recibidos"), ("EN_DIAGNOSTICO", "En diagnóstico"), ("EN_REPARACION", "En reparación"),
+        ("ESPERANDO_REPUESTOS", "Esperando repuestos"), ("FINALIZADO", "Listos"), ("ENTREGADO", "Entregados"),
+        ("CANCELADO", "Cancelados"), ("TODAS", "Todas")
+    ];
+
+    private static readonly string[] Activos = ["RECIBIDO", "EN_DIAGNOSTICO", "EN_REPARACION", "ESPERANDO_REPUESTOS", "FINALIZADO"];
+
+    private List<OrdenResumenDto>? ordenes;
+    private string filtro = "ACTIVAS";
+    private string? buscar;
+
+    private bool Coincide(OrdenResumenDto o, string clave) => clave switch
+    {
+        "TODAS" => true,
+        "ACTIVAS" => Activos.Contains(o.Estado),
+        _ => o.Estado == clave
+    };
+
+    private int Contar(string clave) => ordenes?.Count(o => Coincide(o, clave)) ?? 0;
+
+    private IEnumerable<OrdenResumenDto> Filtradas => (ordenes ?? [])
+        .Where(o => Coincide(o, filtro))
+        .Where(o => string.IsNullOrWhiteSpace(buscar)
+                    || $"{o.NumeroOrden} {o.Placa} {o.Cliente} {o.MotivoIngreso} {o.Vehiculo}".Contains(buscar.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Filtros.Any(f => f.Clave == EstadoInicial)) filtro = EstadoInicial!;
+        try
+        {
+            ordenes = await Api.ListarAsync("");
+        }
+        catch (ApiException ex)
+        {
+            ordenes = [];
+            Notificaciones.Error(ex.Message);
+        }
+    }
+}

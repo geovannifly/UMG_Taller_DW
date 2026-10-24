@@ -1,0 +1,30 @@
+<div class="td-encabezado">
+    <div class="td-encabezado-titulo">
+        @if (Volver is not null)
+        {
+            <a href="@Volver" class="btn btn-light btn-icono" title="Volver"><i class="bi bi-arrow-left"></i></a>
+        }
+        <div class="td-encabezado-icono"><i class="bi @Icono"></i></div>
+        <div>
+            <h1 tabindex="-1">@Titulo</h1>
+            @if (Subtitulo is not null)
+            {
+                <p>@Subtitulo</p>
+            }
+            @Detalle
+        </div>
+    </div>
+    @if (ChildContent is not null)
+    {
+        <div class="td-encabezado-acciones">@ChildContent</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Icono { get; set; } = "bi-grid";
+    [Parameter, EditorRequired] public string Titulo { get; set; } = string.Empty;
+    [Parameter] public string? Subtitulo { get; set; }
+    [Parameter] public string? Volver { get; set; }
+    [Parameter] public RenderFragment? Detalle { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

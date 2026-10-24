@@ -1,0 +1,11 @@
+@inject NavigationManager Navegacion
+
+@code {
+    protected override void OnInitialized()
+    {
+        var destino = Navegacion.ToBaseRelativePath(Navegacion.Uri);
+        Navegacion.NavigateTo(string.IsNullOrEmpty(destino) || destino.StartsWith("login")
+            ? "login"
+            : $"login?volver={Uri.EscapeDataString(destino)}");
+    }
+}

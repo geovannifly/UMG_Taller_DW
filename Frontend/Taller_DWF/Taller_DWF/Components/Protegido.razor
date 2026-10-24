@@ -1,0 +1,22 @@
+@inject SesionService Sesion
+
+@if (Modulos.Split(',').Any(m => Sesion.Puede(m.Trim(), Accion)))
+{
+    @ChildContent
+}
+else
+{
+    <div class="td-card mt-4">
+        <EstadoVacio Icono="bi-shield-lock" Titulo="Acceso restringido"
+                     Mensaje="Su rol no tiene permiso para usar este módulo. Si lo necesita, solicítelo al administrador.">
+            <a href="" class="btn btn-dark"><i class="bi bi-house"></i> Ir al inicio</a>
+        </EstadoVacio>
+    </div>
+}
+
+@code {
+    /// <summary>Uno o varios códigos de módulo separados por coma (basta con tener permiso en uno).</summary>
+    [Parameter, EditorRequired] public string Modulos { get; set; } = string.Empty;
+    [Parameter] public Accion Accion { get; set; } = Accion.Ver;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

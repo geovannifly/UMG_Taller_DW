@@ -1,0 +1,16 @@
+<div class="td-vacio">
+    <div class="td-vacio-icono"><i class="bi @Icono"></i></div>
+    <h3>@Titulo</h3>
+    @if (!string.IsNullOrEmpty(Mensaje))
+    {
+        <p class="mb-3 small">@Mensaje</p>
+    }
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string Icono { get; set; } = "bi-inbox";
+    [Parameter] public string Titulo { get; set; } = "Sin resultados";
+    [Parameter] public string? Mensaje { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -1,0 +1,27 @@
+@if (Visible)
+{
+    <div class="td-modal-fondo" @onclick="Cerrar">
+        <div class="td-modal @Tamano" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+            <div class="td-modal-cabecera">
+                <div class="td-modal-icono @(Peligro ? "peligro" : "")"><i class="bi @Icono"></i></div>
+                <h2>@Titulo</h2>
+                <button type="button" class="btn btn-ghost btn-icono" @onclick="Cerrar" title="Cerrar"><i class="bi bi-x-lg"></i></button>
+            </div>
+            @ChildContent
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Titulo { get; set; } = string.Empty;
+    [Parameter] public string Icono { get; set; } = "bi-pencil-square";
+    /// <summary>sm, lg o xl (vacío = mediano).</summary>
+    [Parameter] public string Tamano { get; set; } = string.Empty;
+    [Parameter] public bool Peligro { get; set; }
+    [Parameter] public EventCallback OnCerrar { get; set; }
+    /// <summary>El contenido debe incluir sus propios bloques td-modal-cuerpo y td-modal-pie.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private Task Cerrar() => OnCerrar.InvokeAsync();
+}

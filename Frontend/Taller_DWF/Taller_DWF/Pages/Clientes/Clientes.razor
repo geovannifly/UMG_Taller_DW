@@ -1,0 +1,167 @@
+@page "/clientes"
+@inject ClientesApi Api
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject DialogoService Dialogos
+@inject NavigationManager Navegacion
+
+<PageTitle>Clientes · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Clientes">
+    <Encabezado Icono="bi-people" Titulo="Clientes" Subtitulo="Personas y empresas que traen sus vehículos al taller">
+        @if (Sesion.Puede(Modulos.Clientes, Accion.Crear))
+        {
+            <button class="btn btn-primary" @onclick="Nuevo"><i class="bi bi-person-plus"></i> Nuevo cliente</button>
+        }
+    </Encabezado>
+
+    <div class="td-card">
+        <div class="td-barra">
+            <div class="input-icono">
+                <i class="bi bi-search"></i>
+                <input class="form-control" placeholder="Buscar por nombre, NIT, DPI, teléfono o placa..."
+                       @bind="buscar" @bind:event="oninput" @bind:after="BuscarConPausa" />
+            </div>
+            <div class="form-check form-switch ms-auto mb-0">
+                <input class="form-check-input" type="checkbox" id="inactivos" @bind="incluirInactivos" @bind:after="Cargar" />
+                <label class="form-check-label small" for="inactivos">Mostrar inactivos</label>
+            </div>
+        </div>
+
+        @if (clientes is null)
+        {
+            <Cargando />
+        }
+        else if (clientes.Count == 0)
+        {
+            <EstadoVacio Icono="bi-people" Titulo="No hay clientes que mostrar"
+                         Mensaje="@(string.IsNullOrWhiteSpace(buscar) ? "Registre el primer cliente del taller." : "Pruebe con otro término de búsqueda.")" />
+        }
+        else
+        {
+            <div class="td-tabla-contenedor">
+                <table class="td-tabla">
+                    <thead>
+                        <tr><th>Cliente</th><th>NIT / DPI</th><th>Contacto</th><th class="text-center">Vehículos</th><th>Registro</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in clientes)
+                        {
+                            <tr class="clic @(c.Activo ? "" : "inactivo")" @onclick="@(() => Navegacion.NavigateTo($"clientes/{c.ClienteId}"))">
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="td-avatar sm">@Ui.Iniciales(c.NombreCompleto)</span>
+                                        <div>
+                                            <div class="td-celda-principal">@c.NombreCompleto</div>
+                                            @if (!c.Activo) { <span class="td-celda-sub">Inactivo</span> }
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><div>@c.Nit</div><div class="td-celda-sub">@(c.Dpi ?? "Sin DPI")</div></td>
+                                <td><div><i class="bi bi-telephone text-ter me-1"></i>@c.Telefono</div><div class="td-celda-sub">@c.Correo</div></td>
+                                <td class="text-center fw-bold tnum">@c.CantidadVehiculos</td>
+                                <td class="small text-sec">@Ui.Fecha(c.FechaRegistro)</td>
+                                <td class="acciones" @onclick:stopPropagation="true">
+                                    @if (Sesion.Puede(Modulos.Clientes, Accion.Editar))
+                                    {
+                                        <button class="btn btn-ghost btn-icono" title="Editar" @onclick="() => Editar(c)"><i class="bi bi-pencil"></i></button>
+                                    }
+                                    @if (Sesion.Puede(Modulos.Clientes, Accion.Eliminar))
+                                    {
+                                        <button class="btn btn-ghost btn-icono" title="@(c.Activo ? "Desactivar" : "Activar")" @onclick="() => CambiarEstado(c)">
+                                            <i class="bi @(c.Activo ? "bi-toggle-on text-success" : "bi-toggle-off")"></i>
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</Protegido>
+
+<ClienteFormModal Visible="modal" Cliente="seleccionado" OnCerrar="() => modal = false" OnGuardado="Guardado" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "nuevo")] public string? AbrirNuevo { get; set; }
+
+    private List<ClienteDto>? clientes;
+    private string? buscar;
+    private bool incluirInactivos;
+    private bool modal;
+    private ClienteDto? seleccionado;
+    private CancellationTokenSource? pausa;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AbrirNuevo == "1" && Sesion.Puede(Modulos.Clientes, Accion.Crear)) Nuevo();
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        try
+        {
+            clientes = await Api.ListarAsync(buscar, incluirInactivos);
+        }
+        catch (ApiException ex)
+        {
+            clientes = [];
+            Notificaciones.Error(ex.Message);
+        }
+    }
+
+    private async Task BuscarConPausa()
+    {
+        pausa?.Cancel();
+        pausa = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, pausa.Token);
+            await Cargar();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private void Nuevo()
+    {
+        seleccionado = null;
+        modal = true;
+    }
+
+    private void Editar(ClienteDto cliente)
+    {
+        seleccionado = cliente;
+        modal = true;
+    }
+
+    private async Task Guardado(ClienteDto cliente)
+    {
+        modal = false;
+        if (seleccionado is null)
+            Navegacion.NavigateTo($"clientes/{cliente.ClienteId}");
+        else
+            await Cargar();
+    }
+
+    private async Task CambiarEstado(ClienteDto cliente)
+    {
+        var accion = cliente.Activo ? "desactivar" : "activar";
+        if (!await Dialogos.ConfirmarAsync($"¿{char.ToUpper(accion[0])}{accion[1..]} cliente?",
+                $"Se va a {accion} a {cliente.NombreCompleto}.", "Sí, " + accion, cliente.Activo))
+            return;
+
+        try
+        {
+            await Api.CambiarEstadoAsync(cliente.ClienteId, !cliente.Activo);
+            Notificaciones.Exito($"Cliente {(cliente.Activo ? "desactivado" : "activado")}.");
+            await Cargar();
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+        }
+    }
+}

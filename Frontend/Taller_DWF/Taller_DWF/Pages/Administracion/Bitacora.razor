@@ -1,0 +1,84 @@
+@page "/administracion/bitacora"
+@inject BitacoraApi Api
+@inject NotificacionService Notificaciones
+
+<PageTitle>Bitácora · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Bitacora">
+    <Encabezado Icono="bi-journal-text" Titulo="Bitácora" Subtitulo="Historial de operaciones realizadas en el sistema" />
+
+    <div class="td-card">
+        <div class="td-barra">
+            <div class="input-icono">
+                <i class="bi bi-search"></i>
+                <input class="form-control" placeholder="Usuario, acción o detalle..." @bind="buscar" @bind:after="Cargar" />
+            </div>
+            <select class="form-select w-auto" @bind="modulo" @bind:after="Cargar">
+                <option value="">Todos los módulos</option>
+                @foreach (var m in ModulosBitacora) { <option value="@m">@m</option> }
+            </select>
+            <input type="date" class="form-control w-auto" @bind="desde" @bind:after="Cargar" />
+            <span class="text-ter">a</span>
+            <input type="date" class="form-control w-auto" @bind="hasta" @bind:after="Cargar" />
+        </div>
+
+        @if (registros is null)
+        {
+            <Cargando />
+        }
+        else if (registros.Count == 0)
+        {
+            <EstadoVacio Icono="bi-journal" Titulo="Sin registros en el periodo" />
+        }
+        else
+        {
+            <div class="td-tabla-contenedor">
+                <table class="td-tabla">
+                    <thead><tr><th>Fecha</th><th>Usuario</th><th>Módulo</th><th>Acción</th><th>Detalle</th><th>IP</th></tr></thead>
+                    <tbody>
+                        @foreach (var b in registros)
+                        {
+                            <tr>
+                                <td class="small text-nowrap">@Ui.FechaHora(b.Fecha)</td>
+                                <td class="small fw-semibold">@(b.NombreUsuario ?? "—")</td>
+                                <td><span class="td-codigo">@b.Modulo</span></td>
+                                <td><Insignia Clase="@ClaseAccion(b.Accion)" Texto="@b.Accion" SinPunto="true" /></td>
+                                <td class="small">@b.Detalle</td>
+                                <td class="small text-ter">@b.Ip</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="small text-ter p-3">Se muestran hasta 500 registros. Use los filtros para acotar la búsqueda.</div>
+        }
+    </div>
+</Protegido>
+
+@code {
+    private static readonly string[] ModulosBitacora =
+        ["AUTENTICACION", "CLIENTES", "VEHICULOS", "ORDENES", "DIAGNOSTICOS", "REPARACIONES", "SOLICITUDES",
+         "INVENTARIO", "DESPACHOS", "FACTURACION", "USUARIOS", "ROLES", "PARAMETROS"];
+
+    private List<BitacoraDto>? registros;
+    private string? buscar;
+    private string modulo = "";
+    private DateTime? desde = DateTime.Today.AddDays(-7);
+    private DateTime? hasta = DateTime.Today;
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        try { registros = await Api.ConsultarAsync(desde, hasta, modulo, buscar); }
+        catch (ApiException ex) { registros = []; Notificaciones.Error(ex.Message); }
+    }
+
+    private static string ClaseAccion(string accion) => accion switch
+    {
+        "LOGIN_FALLIDO" or "ANULAR" or "CANCELAR" or "RECHAZAR" or "DESACTIVAR" or "ELIMINAR" => "est-cancelado",
+        "CREAR" or "EMITIR" or "DESPACHAR" or "ACTIVAR" => "est-listo",
+        "LOGIN" => "est-recibido",
+        _ => "est-diagnostico"
+    };
+}

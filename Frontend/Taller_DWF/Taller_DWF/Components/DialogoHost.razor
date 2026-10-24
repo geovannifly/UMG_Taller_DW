@@ -1,0 +1,41 @@
+@implements IDisposable
+@inject DialogoService Dialogos
+
+@if (Dialogos.Actual is { } d)
+{
+    <Modal Visible="true" Titulo="@d.Titulo" Tamano="sm" Peligro="d.Peligro"
+           Icono="@(d.Peligro ? "bi-exclamation-triangle" : "bi-question-lg")" OnCerrar="() => Dialogos.Responder(false)">
+        <div class="td-modal-cuerpo">
+            <p class="mb-0 text-sec">@d.Mensaje</p>
+            @if (d.EtiquetaTexto is not null)
+            {
+                <label class="form-label mt-3">@d.EtiquetaTexto</label>
+                <textarea class="form-control" rows="3" @bind="texto" @bind:event="oninput" maxlength="250"></textarea>
+            }
+        </div>
+        <div class="td-modal-pie">
+            <button class="btn btn-light" @onclick="() => Dialogos.Responder(false)">Cancelar</button>
+            <button class="btn @(d.Peligro ? "btn-danger" : "btn-primary")"
+                    disabled="@(d.EtiquetaTexto is not null && string.IsNullOrWhiteSpace(texto))"
+                    @onclick="Confirmar">
+                @d.TextoConfirmar
+            </button>
+        </div>
+    </Modal>
+}
+
+@code {
+    private string? texto;
+
+    protected override void OnInitialized() => Dialogos.Cambio += Refrescar;
+
+    private void Refrescar()
+    {
+        texto = null;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Confirmar() => Dialogos.Responder(true, texto?.Trim());
+
+    public void Dispose() => Dialogos.Cambio -= Refrescar;
+}

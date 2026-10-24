@@ -1,0 +1,151 @@
+@page "/despachos"
+@inject DespachosApi Api
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject DialogoService Dialogos
+
+<PageTitle>Despachos · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Despachos">
+    <Encabezado Icono="bi-truck" Titulo="Despachos de bodega" Subtitulo="Atienda las solicitudes de repuestos de los mecánicos">
+        <button class="btn btn-light" @onclick="Cargar"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+    </Encabezado>
+
+    <div class="td-segmento mb-3">
+        <button class="@(vista == "PENDIENTE" ? "activo" : "")" @onclick="@(() => Ver("PENDIENTE"))"><i class="bi bi-hourglass-split"></i> Pendientes</button>
+        <button class="@(vista == "" ? "activo" : "")" @onclick="@(() => Ver(""))"><i class="bi bi-clock-history"></i> Historial</button>
+    </div>
+
+    @if (solicitudes is null)
+    {
+        <Cargando />
+    }
+    else if (solicitudes.Count == 0)
+    {
+        <div class="td-card">
+            <EstadoVacio Icono="bi-check2-all" Titulo="@(vista == "PENDIENTE" ? "No hay solicitudes pendientes" : "Sin movimientos")"
+                         Mensaje="@(vista == "PENDIENTE" ? "Todo lo solicitado por el taller ya fue atendido." : null)" />
+        </div>
+    }
+    else if (vista == "PENDIENTE")
+    {
+        <div class="row g-3">
+            @foreach (var s in solicitudes)
+            {
+                var alcanza = s.StockActual >= s.Cantidad;
+                <div class="col-md-6 col-xxl-4">
+                    <div class="td-card h-100 d-flex flex-column">
+                        <div class="td-card-cuerpo flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <a href="ordenes/@s.OrdenId" class="fw-bold">@s.NumeroOrden</a>
+                                    <div><span class="td-placa">@s.Placa</span></div>
+                                </div>
+                                <span class="small text-ter">@Ui.TiempoTranscurrido(s.FechaSolicitud)</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-3 my-3">
+                                <div class="td-avatar" style="width:52px;height:52px;font-size:1.25rem">@s.Cantidad</div>
+                                <div class="min-w-0">
+                                    <div class="fw-bold">@s.Repuesto</div>
+                                    <div class="small text-ter"><span class="td-codigo">@s.CodigoRepuesto</span></div>
+                                </div>
+                            </div>
+                            <div class="td-consulta @(alcanza ? "ok" : "no") py-2">
+                                <i class="bi @(alcanza ? "bi-box-seam" : "bi-exclamation-triangle")"></i>
+                                <span>Stock en bodega: <b>@s.StockActual</b> @(alcanza ? "" : "· insuficiente")</span>
+                            </div>
+                            <div class="small text-sec mt-2"><i class="bi bi-person"></i> @s.Solicitante</div>
+                            @if (s.Observacion is not null) { <div class="small text-sec fst-italic">"@s.Observacion"</div> }
+                        </div>
+                        @if (Sesion.Puede(Modulos.Despachos, Accion.Editar))
+                        {
+                            <div class="td-modal-pie" style="border-radius:0 0 var(--td-radio) var(--td-radio)">
+                                <button class="btn btn-outline-danger btn-sm" disabled="@ocupado" @onclick="() => Rechazar(s)"><i class="bi bi-x-lg"></i> Rechazar</button>
+                                <button class="btn btn-primary btn-sm" disabled="@(ocupado || !alcanza)" @onclick="() => Despachar(s)"><i class="bi bi-check2"></i> Despachar</button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="td-card">
+            <div class="td-tabla-contenedor">
+                <table class="td-tabla">
+                    <thead><tr><th>Repuesto</th><th>Orden</th><th class="text-center">Cant.</th><th>Estado</th><th>Atendió</th><th class="text-end">Subtotal</th></tr></thead>
+                    <tbody>
+                        @foreach (var s in solicitudes)
+                        {
+                            <tr>
+                                <td><div class="td-celda-principal">@s.Repuesto</div><div class="td-celda-sub"><span class="td-codigo">@s.CodigoRepuesto</span> · pidió @s.Solicitante</div></td>
+                                <td><a href="ordenes/@s.OrdenId">@s.NumeroOrden</a></td>
+                                <td class="text-center fw-bold">@s.Cantidad</td>
+                                <td><Insignia Clase="@Ui.ClaseSolicitud(s.Estado)" Texto="@Ui.Solicitud(s.Estado)" />
+                                    @if (s.MotivoRechazo is not null) { <div class="small text-danger mt-1">@s.MotivoRechazo</div> }</td>
+                                <td class="small">@(s.Bodeguero ?? "—")<div class="td-celda-sub">@Ui.FechaHora(s.FechaRespuesta)</div></td>
+                                <td class="text-end tnum">@(s.Subtotal is null ? "—" : Ui.Moneda(s.Subtotal))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</Protegido>
+
+@code {
+    private List<SolicitudDto>? solicitudes;
+    private string vista = "PENDIENTE";
+    private bool ocupado;
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Ver(string estado)
+    {
+        vista = estado;
+        solicitudes = null;
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        try { solicitudes = await Api.ListarAsync(vista); }
+        catch (ApiException ex) { solicitudes = []; Notificaciones.Error(ex.Message); }
+    }
+
+    private async Task Despachar(SolicitudDto s)
+    {
+        if (!await Dialogos.ConfirmarAsync("Confirmar despacho",
+                $"Se entregarán {s.Cantidad} x {s.Repuesto} para la orden {s.NumeroOrden} y se descontarán del inventario.", "Despachar"))
+            return;
+
+        ocupado = true;
+        try
+        {
+            await Api.DespacharAsync(s.SolicitudId, null);
+            Notificaciones.Exito($"Despachado: {s.Cantidad} x {s.Repuesto}.");
+            await Cargar();
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private async Task Rechazar(SolicitudDto s)
+    {
+        var motivo = await Dialogos.PedirMotivoAsync("Rechazar solicitud", $"{s.Cantidad} x {s.Repuesto} · {s.NumeroOrden}",
+            "Motivo del rechazo", "Rechazar");
+        if (motivo is null) return;
+
+        ocupado = true;
+        try
+        {
+            await Api.RechazarAsync(s.SolicitudId, motivo);
+            Notificaciones.Exito("Solicitud rechazada.");
+            await Cargar();
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+}

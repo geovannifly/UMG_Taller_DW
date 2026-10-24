@@ -1,0 +1,39 @@
+### Pruebas rápidas de la API de Taller DW
+### En Visual Studio: clic en "Enviar solicitud" sobre cada bloque.
+### 1) Ejecute el login y copie el valor de "token" en la variable @token.
+
+@api = https://localhost:7150/api
+@token = PEGUE_AQUI_EL_TOKEN
+
+### Iniciar sesión
+POST {{api}}/auth/login
+Content-Type: application/json
+
+{
+  "nombreUsuario": "admin",
+  "password": "Admin123!"
+}
+
+### Perfil y permisos del usuario autenticado
+GET {{api}}/auth/perfil
+Authorization: Bearer {{token}}
+
+### Indicadores del panel de inicio
+GET {{api}}/dashboard
+Authorization: Bearer {{token}}
+
+### API de bodega: existencias de todos los repuestos
+GET {{api}}/bodega/existencias
+Authorization: Bearer {{token}}
+
+### API de bodega: ¿hay 3 unidades del repuesto 5?
+GET {{api}}/bodega/existencias/5?cantidad=3
+Authorization: Bearer {{token}}
+
+### Órdenes activas
+GET {{api}}/ordenes?estado=ACTIVAS
+Authorization: Bearer {{token}}
+
+### Tablero de reparaciones de todo el taller
+GET {{api}}/reparaciones/tablero?soloMias=false
+Authorization: Bearer {{token}}

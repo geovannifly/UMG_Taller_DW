@@ -1,0 +1,20 @@
+<div class="td-stock">
+    <div class="d-flex justify-content-between align-items-baseline gap-2">
+        <span class="fw-bold tnum">@Disponible <span class="text-ter fw-normal small">disp.</span></span>
+        <span class="small text-ter tnum">@Stock en stock</span>
+    </div>
+    <div class="td-stock-barra">
+        <span class="@ClaseBarra" style="width:@Porcentaje%"></span>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Stock { get; set; }
+    [Parameter] public int Disponible { get; set; }
+    [Parameter] public int Minimo { get; set; }
+    [Parameter] public string Estado { get; set; } = "DISPONIBLE";
+
+    // La barra se llena al 100% cuando el disponible triplica el mínimo
+    private int Porcentaje => Disponible <= 0 ? 4 : (int)Math.Clamp(Disponible * 100.0 / Math.Max(Minimo * 3, 1), 6, 100);
+    private string ClaseBarra => Estado switch { "AGOTADO" => "agotado", "BAJO" => "bajo", _ => "" };
+}

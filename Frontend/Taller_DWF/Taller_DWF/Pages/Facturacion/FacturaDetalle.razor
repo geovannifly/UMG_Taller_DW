@@ -1,0 +1,137 @@
+@page "/facturacion/{Id:int}"
+@inject FacturasApi Api
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject DialogoService Dialogos
+@inject NavigationManager Navegacion
+@inject IJSRuntime JS
+
+<PageTitle>@(factura?.NumeroFactura ?? "Factura") · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Facturacion">
+    @if (factura is null)
+    {
+        <Cargando />
+    }
+    else
+    {
+        var t = factura.Taller;
+        <div class="no-imprimir">
+            <Encabezado Icono="bi-receipt" Titulo="@($"Factura {factura.NumeroFactura}")" Subtitulo="@($"Orden {factura.NumeroOrden}")" Volver="facturacion?tab=emitidas">
+                <a class="btn btn-light" href="ordenes/@factura.OrdenId"><i class="bi bi-clipboard-check"></i> Ver orden</a>
+                @if (factura.Estado == "EMITIDA" && Sesion.Puede(Modulos.Facturacion, Accion.Eliminar))
+                {
+                    <button class="btn btn-outline-danger" @onclick="Anular"><i class="bi bi-x-circle"></i> Anular</button>
+                }
+                <button class="btn btn-primary" @onclick="Imprimir"><i class="bi bi-printer"></i> Imprimir</button>
+            </Encabezado>
+        </div>
+
+        <div class="td-factura">
+            <div class="td-factura-cabecera">
+                <div class="d-flex gap-3 align-items-center">
+                    <LogoTaller Tamano="54" />
+                    <div>
+                        <div class="td-marca-texto" style="font-size:1.3rem">@t.Nombre.ToUpper()</div>
+                        <div class="small" style="color:#b9b9be">NIT @t.Nit · @t.Direccion</div>
+                        <div class="small" style="color:#b9b9be">Tel. @t.Telefono · @t.Correo</div>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <div class="small-caps" style="color:#b9b9be">Factura</div>
+                    <div class="fs-3 fw-800" style="color:var(--td-amarillo)">@factura.NumeroFactura</div>
+                    <div class="small" style="color:#b9b9be">@Ui.FechaHora(factura.FechaEmision)</div>
+                </div>
+                @if (factura.Estado == "ANULADA") { <div class="td-sello-anulada">ANULADA</div> }
+            </div>
+
+            <div class="td-factura-cuerpo">
+                <div class="row g-3 mb-4">
+                    <div class="col-sm-7">
+                        <div class="small-caps mb-1">Facturar a</div>
+                        <div class="fw-bold fs-6">@factura.NombreCliente</div>
+                        <div class="small text-sec">NIT: @factura.NitCliente</div>
+                        <div class="small text-sec">@(factura.DireccionCliente ?? "Ciudad")</div>
+                    </div>
+                    <div class="col-sm-5 text-sm-end">
+                        <div class="small-caps mb-1">Vehículo</div>
+                        <div><span class="td-placa">@factura.Placa</span></div>
+                        <div class="small text-sec mt-1">@factura.Vehiculo</div>
+                        <div class="small text-sec">Orden @factura.NumeroOrden</div>
+                    </div>
+                </div>
+
+                <table class="td-tabla mb-4" style="border:1px solid var(--td-borde);border-radius:var(--td-radio)">
+                    <thead><tr><th>Descripción</th><th class="text-center">Cant.</th><th class="text-end">Precio unit.</th><th class="text-end">Subtotal</th></tr></thead>
+                    <tbody>
+                        @foreach (var l in factura.Lineas)
+                        {
+                            <tr>
+                                <td>@l.Descripcion</td>
+                                <td class="text-center">@l.Cantidad</td>
+                                <td class="text-end tnum">@Ui.Moneda(l.PrecioUnitario)</td>
+                                <td class="text-end tnum">@Ui.Moneda(l.Subtotal)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <div class="d-flex flex-wrap gap-4 justify-content-between">
+                    <div class="small text-sec">
+                        <div><b>Método de pago:</b> @Ui.MetodoPago(factura.MetodoPago)</div>
+                        <div><b>Atendió:</b> @factura.EmitidaPor</div>
+                        @if (factura.Estado == "ANULADA")
+                        {
+                            <div class="text-danger mt-2"><b>Anulada</b> el @Ui.FechaHora(factura.FechaAnulacion): @factura.MotivoAnulacion</div>
+                        }
+                    </div>
+                    <div class="td-factura-totales flex-grow-1">
+                        <div><span class="text-sec">Mano de obra</span><span class="tnum">@Ui.Moneda(factura.SubtotalManoObra)</span></div>
+                        <div><span class="text-sec">Repuestos</span><span class="tnum">@Ui.Moneda(factura.SubtotalRepuestos)</span></div>
+                        @if (factura.Descuento > 0)
+                        {
+                            <div><span class="text-sec">Descuento</span><span class="tnum">− @Ui.Moneda(factura.Descuento)</span></div>
+                        }
+                        <div class="small text-ter"><span>Base imponible</span><span class="tnum">@Ui.Moneda(factura.BaseImponible)</span></div>
+                        <div class="small text-ter"><span>IVA (@factura.PorcentajeImpuesto%)</span><span class="tnum">@Ui.Moneda(factura.Impuesto)</span></div>
+                        <div class="total"><span>TOTAL</span><span class="tnum">@Ui.Moneda(factura.Total)</span></div>
+                    </div>
+                </div>
+
+                <div class="text-center small text-ter mt-5">Gracias por confiar en @t.Nombre. Conserve este documento para cualquier garantía.</div>
+            </div>
+        </div>
+    }
+</Protegido>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private FacturaDetalleDto? factura;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try { factura = await Api.ObtenerAsync(Id); }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+            Navegacion.NavigateTo("facturacion");
+        }
+    }
+
+    private async Task Imprimir() => await JS.InvokeVoidAsync("print");
+
+    private async Task Anular()
+    {
+        var motivo = await Dialogos.PedirMotivoAsync("Anular factura",
+            $"La factura {factura!.NumeroFactura} quedará sin validez y la orden podrá facturarse de nuevo.", "Motivo de la anulación", "Anular factura");
+        if (motivo is null) return;
+
+        try
+        {
+            factura = await Api.AnularAsync(Id, motivo);
+            Notificaciones.Exito("Factura anulada.");
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+    }
+}

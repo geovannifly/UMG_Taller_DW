@@ -1,0 +1,545 @@
+@page "/ordenes/{Id:int}"
+@inject OrdenesApi Ordenes
+@inject ReparacionesApi Reparaciones
+@inject DiagnosticosApi Diagnosticos
+@inject SolicitudesApi Solicitudes
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject DialogoService Dialogos
+@inject NavigationManager Navegacion
+
+<PageTitle>@(orden?.NumeroOrden ?? "Orden") · Taller DW</PageTitle>
+
+<Protegido Modulos="@($"{Modulos.Ordenes},{Modulos.Reparaciones},{Modulos.Diagnosticos},{Modulos.Despachos},{Modulos.Facturacion}")">
+    @if (orden is null)
+    {
+        <Cargando Texto="Cargando orden de trabajo..." />
+    }
+    else
+    {
+        <Encabezado Icono="bi-clipboard-check" Titulo="@($"Orden {orden.NumeroOrden}")" Volver="@VolverA">
+            <Detalle>
+                <div class="d-flex flex-wrap gap-2 mt-1 align-items-center">
+                    <EstadoOrden Estado="@orden.Estado" />
+                    <Insignia Clase="@Ui.ClasePrioridad(orden.Prioridad)" Texto="@($"Prioridad {Ui.Prioridad(orden.Prioridad).ToLower()}")" SinPunto="true" />
+                    <span class="small text-ter">Ingresó @Ui.TiempoTranscurrido(orden.FechaIngreso)</span>
+                </div>
+            </Detalle>
+            <ChildContent>
+                @* ---- Acciones del mecánico ---- *@
+                @if (EsResponsable && Sesion.Puede(Modulos.Reparaciones, Accion.Editar))
+                {
+                    @foreach (var siguiente in orden.EstadosSiguientes)
+                    {
+                        <button class="btn @(siguiente == "FINALIZADO" ? "btn-primary" : "btn-light")" @onclick="() => AbrirCambioEstado(siguiente)"
+                                disabled="@(BloqueoEstado(siguiente) is not null)" title="@BloqueoEstado(siguiente)">
+                            <i class="bi @Ui.IconoEstadoOrden(siguiente)"></i> @Ui.AccionEstado(siguiente)
+                        </button>
+                    }
+                }
+                @* ---- Acciones de recepción / caja ---- *@
+                @if (orden.Estado == "FINALIZADO" && orden.Factura?.Estado != "EMITIDA" && Sesion.Puede(Modulos.Facturacion, Accion.Crear))
+                {
+                    <a class="btn btn-primary" href="facturacion/nueva/@orden.OrdenId"><i class="bi bi-receipt"></i> Facturar</a>
+                }
+                @if (orden.Estado == "FINALIZADO" && orden.Factura?.Estado == "EMITIDA" && Sesion.Puede(Modulos.Ordenes, Accion.Editar))
+                {
+                    <button class="btn btn-dark" @onclick="() => modalSalida = true"><i class="bi bi-flag"></i> Entregar vehículo</button>
+                }
+                @if (EsAsignable && Sesion.Puede(Modulos.Ordenes, Accion.Editar))
+                {
+                    <button class="btn @(orden.MecanicoId is null ? "btn-primary" : "btn-light")" @onclick="AbrirAsignacion">
+                        <i class="bi bi-person-gear"></i> @(orden.MecanicoId is null ? "Asignar mecánico" : "Reasignar")
+                    </button>
+                    <div class="dropdown">
+                        <button class="btn btn-light btn-icono" @onclick="() => menuMas = !menuMas" title="Más opciones"><i class="bi bi-three-dots-vertical"></i></button>
+                        @if (menuMas)
+                        {
+                            <div class="position-fixed top-0 start-0 w-100 h-100" style="z-index:1049" @onclick="() => menuMas = false"></div>
+                            <div class="td-desplegable">
+                                <button @onclick="AbrirEdicion"><i class="bi bi-pencil"></i> Editar datos de ingreso</button>
+                                <button class="text-danger" @onclick="Cancelar"><i class="bi bi-x-circle"></i> Cancelar orden</button>
+                            </div>
+                        }
+                    </div>
+                }
+            </ChildContent>
+        </Encabezado>
+
+        @if (orden.Estado == "CANCELADO")
+        {
+            <div class="td-consulta no mb-3"><i class="bi bi-x-octagon fs-5"></i>
+                <div><div class="fw-bold">Orden cancelada</div><div class="small">@orden.Historial.LastOrDefault()?.Comentario</div></div>
+            </div>
+        }
+        else
+        {
+            <div class="td-card mb-3"><div class="td-card-cuerpo"><FlujoOrden Estado="@orden.Estado" /></div></div>
+        }
+
+        @if (orden.MecanicoId is null && EsAsignable)
+        {
+            <div class="td-consulta neutro mb-3"><i class="bi bi-info-circle"></i> La orden está esperando que se le asigne un mecánico para iniciar el diagnóstico.</div>
+        }
+
+        @if (EsResponsable && Sesion.Puede(Modulos.Reparaciones, Accion.Editar))
+        {
+            @foreach (var aviso in orden.EstadosSiguientes.Select(BloqueoEstado).OfType<string>().Distinct())
+            {
+                <div class="td-consulta neutro mb-3"><i class="bi bi-exclamation-circle"></i> @aviso</div>
+            }
+        }
+
+        <div class="row g-3">
+            <div class="col-xl-8">
+                <div class="td-card">
+                    <div class="td-tabs">
+                        <button class="td-tab @(tab == "diag" ? "activo" : "")" @onclick="@(() => tab = "diag")"><i class="bi bi-search"></i> Diagnósticos <span class="cuenta">@orden.Diagnosticos.Count</span></button>
+                        <button class="td-tab @(tab == "rep" ? "activo" : "")" @onclick="@(() => tab = "rep")"><i class="bi bi-box-seam"></i> Repuestos <span class="cuenta">@orden.Solicitudes.Count</span></button>
+                        <button class="td-tab @(tab == "hist" ? "activo" : "")" @onclick="@(() => tab = "hist")"><i class="bi bi-clock-history"></i> Historial <span class="cuenta">@orden.Historial.Count</span></button>
+                    </div>
+
+                    @if (tab == "diag")
+                    {
+                        @if (PuedeDiagnosticar)
+                        {
+                            <div class="td-barra justify-content-end">
+                                <button class="btn btn-primary btn-sm" @onclick="() => AbrirDiagnostico(null)"><i class="bi bi-plus-lg"></i> Registrar diagnóstico</button>
+                            </div>
+                        }
+                        @if (orden.Diagnosticos.Count == 0)
+                        {
+                            <EstadoVacio Icono="bi-search" Titulo="Sin diagnósticos" Mensaje="El mecánico asignado registra aquí las fallas detectadas y las reparaciones requeridas." />
+                        }
+                        else
+                        {
+                            <ul class="td-lista-simple">
+                                @foreach (var d in orden.Diagnosticos)
+                                {
+                                    <li class="align-items-start py-3">
+                                        <span class="td-avatar sm oscuro mt-1">@Ui.Iniciales(d.Mecanico)</span>
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                                <span class="fw-bold">@d.FallaDetectada</span>
+                                                <Insignia Clase="@Ui.ClaseSeveridad(d.Severidad)" Texto="@Ui.Severidad(d.Severidad)" SinPunto="true" />
+                                            </div>
+                                            <div class="small"><i class="bi bi-wrench text-ter me-1"></i>@d.ReparacionRequerida</div>
+                                            @if (!string.IsNullOrWhiteSpace(d.Observaciones)) { <div class="small text-sec mt-1">@d.Observaciones</div> }
+                                            <div class="small text-ter mt-1">@d.Mecanico · @Ui.FechaHora(d.Fecha)</div>
+                                        </div>
+                                        <div class="text-end">
+                                            <div class="fw-bold tnum">@Ui.Moneda(d.CostoManoObra)</div>
+                                            <div class="small text-ter">mano de obra</div>
+                                            @if (PuedeDiagnosticar && (Sesion.Perfil!.EsAdministrador || d.MecanicoId == Sesion.Perfil.UsuarioId) && Sesion.Puede(Modulos.Diagnosticos, Accion.Editar))
+                                            {
+                                                <button class="btn btn-ghost btn-icono mt-1" title="Editar" @onclick="() => AbrirDiagnostico(d)"><i class="bi bi-pencil"></i></button>
+                                            }
+                                            @if (PuedeDiagnosticar && Sesion.Puede(Modulos.Diagnosticos, Accion.Eliminar))
+                                            {
+                                                <button class="btn btn-ghost btn-icono mt-1" title="Eliminar" @onclick="() => EliminarDiagnostico(d)"><i class="bi bi-trash"></i></button>
+                                            }
+                                        </div>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    }
+                    else if (tab == "rep")
+                    {
+                        @if (PuedeSolicitar)
+                        {
+                            <div class="td-barra justify-content-end">
+                                <button class="btn btn-primary btn-sm" @onclick="() => modalSolicitud = true"><i class="bi bi-cart-plus"></i> Solicitar repuesto</button>
+                            </div>
+                        }
+                        @if (orden.Solicitudes.Count == 0)
+                        {
+                            <EstadoVacio Icono="bi-box-seam" Titulo="Sin repuestos solicitados" Mensaje="Las solicitudes se validan contra la existencia en bodega antes de enviarse." />
+                        }
+                        else
+                        {
+                            <div class="td-tabla-contenedor">
+                                <table class="td-tabla">
+                                    <thead><tr><th>Repuesto</th><th class="text-center">Cant.</th><th>Estado</th><th class="text-end">Subtotal</th><th></th></tr></thead>
+                                    <tbody>
+                                        @foreach (var s in orden.Solicitudes)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="td-celda-principal">@s.Repuesto</div>
+                                                    <div class="td-celda-sub"><span class="td-codigo">@s.CodigoRepuesto</span> · @s.Solicitante · @Ui.FechaHora(s.FechaSolicitud)</div>
+                                                    @if (s.MotivoRechazo is not null) { <div class="small text-danger mt-1"><i class="bi bi-x-circle"></i> @s.MotivoRechazo</div> }
+                                                </td>
+                                                <td class="text-center fw-bold tnum">@s.Cantidad</td>
+                                                <td><Insignia Clase="@Ui.ClaseSolicitud(s.Estado)" Texto="@Ui.Solicitud(s.Estado)" /></td>
+                                                <td class="text-end tnum">@(s.Subtotal is null ? "—" : Ui.Moneda(s.Subtotal))</td>
+                                                <td class="acciones">
+                                                    @if (s.Estado == "PENDIENTE" && Sesion.Puede(Modulos.Solicitudes, Accion.Eliminar) && EsResponsable)
+                                                    {
+                                                        <button class="btn btn-ghost btn-icono" title="Cancelar solicitud" @onclick="() => CancelarSolicitud(s)"><i class="bi bi-x-lg"></i></button>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="td-card-cuerpo">
+                            <ul class="td-timeline">
+                                @foreach (var h in Enumerable.Reverse(orden.Historial))
+                                {
+                                    var cambio = h.EstadoAnterior != h.EstadoNuevo;
+                                    <li class="@(cambio ? "cambio" : "")">
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            @if (cambio) { <EstadoOrden Estado="@h.EstadoNuevo" /> }
+                                            <span class="fw-semibold small">@h.Usuario</span>
+                                            <span class="cuando">· @Ui.FechaHora(h.Fecha)</span>
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(h.Comentario)) { <div class="small text-sec mt-1">@h.Comentario</div> }
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="col-xl-4">
+                <div class="td-card mb-3">
+                    <div class="td-card-cabecera"><h2><i class="bi bi-car-front"></i> Vehículo y cliente</h2></div>
+                    <div class="td-card-cuerpo">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <span class="td-placa fs-6">@orden.Vehiculo.Placa</span>
+                            <div>
+                                <div class="fw-bold">@orden.Vehiculo.Marca @orden.Vehiculo.Modelo</div>
+                                <div class="small text-ter">@orden.Vehiculo.Anio · @(orden.Vehiculo.Color ?? "—")</div>
+                            </div>
+                        </div>
+                        <div class="td-separador"></div>
+                        <div class="fw-semibold">@orden.Cliente.NombreCompleto</div>
+                        <div class="small text-sec"><i class="bi bi-telephone me-1"></i>@orden.Cliente.Telefono</div>
+                        @if (orden.Cliente.Correo is not null) { <div class="small text-sec"><i class="bi bi-envelope me-1"></i>@orden.Cliente.Correo</div> }
+                        <div class="small text-sec">NIT @orden.Cliente.Nit</div>
+                    </div>
+                </div>
+
+                <div class="td-card mb-3">
+                    <div class="td-card-cabecera"><h2><i class="bi bi-info-circle"></i> Ingreso</h2></div>
+                    <div class="td-card-cuerpo">
+                        <div class="td-datos" style="grid-template-columns:1fr 1fr">
+                            <div class="td-dato"><div class="etq">Fecha</div><div class="val small">@Ui.FechaHora(orden.FechaIngreso)</div></div>
+                            <div class="td-dato"><div class="etq">Entrega estimada</div><div class="val small">@Ui.Fecha(orden.FechaEstimada)</div></div>
+                            <div class="td-dato"><div class="etq">Kilometraje</div><div class="val small">@Ui.Numero(orden.Kilometraje) km</div></div>
+                            <div class="td-dato"><div class="etq">Combustible</div><div class="val small">@orden.NivelCombustible</div></div>
+                            <div class="td-dato"><div class="etq">Recibió</div><div class="val small">@orden.Recepcionista</div></div>
+                            <div class="td-dato"><div class="etq">Mecánico</div><div class="val small">@(orden.Mecanico ?? "Sin asignar")</div></div>
+                            <div class="td-dato" style="grid-column:1/-1"><div class="etq">Motivo</div><div class="val small">@orden.MotivoIngreso</div></div>
+                            @if (!string.IsNullOrWhiteSpace(orden.Observaciones))
+                            {
+                                <div class="td-dato" style="grid-column:1/-1"><div class="etq">Observaciones</div><div class="val small fw-normal">@orden.Observaciones</div></div>
+                            }
+                            @if (orden.FechaSalida is not null)
+                            {
+                                <div class="td-dato" style="grid-column:1/-1"><div class="etq">Entregado</div>
+                                    <div class="val small">@Ui.FechaHora(orden.FechaSalida) · @orden.UsuarioSalida</div>
+                                    @if (orden.ObservacionSalida is not null) { <div class="small text-sec">@orden.ObservacionSalida</div> }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="td-card">
+                    <div class="td-card-cabecera"><h2><i class="bi bi-calculator"></i> Costos</h2></div>
+                    <div class="td-card-cuerpo">
+                        <div class="d-flex justify-content-between mb-1"><span class="text-sec">Mano de obra</span><span class="tnum">@Ui.Moneda(orden.TotalManoObra)</span></div>
+                        <div class="d-flex justify-content-between mb-2"><span class="text-sec">Repuestos despachados</span><span class="tnum">@Ui.Moneda(orden.TotalRepuestos)</span></div>
+                        <div class="d-flex justify-content-between pt-2 border-top fw-800 fs-5"><span>Total</span><span class="tnum">@Ui.Moneda(orden.TotalManoObra + orden.TotalRepuestos)</span></div>
+                        @if (orden.Factura is not null)
+                        {
+                            <div class="td-separador"></div>
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="small text-ter">Factura</div>
+                                    @if (Sesion.Puede(Modulos.Facturacion)) { <a href="facturacion/@orden.Factura.FacturaId" class="fw-bold">@orden.Factura.NumeroFactura</a> }
+                                    else { <span class="fw-bold">@orden.Factura.NumeroFactura</span> }
+                                </div>
+                                <Insignia Clase="@(orden.Factura.Estado == "EMITIDA" ? "est-listo" : "est-cancelado")" Texto="@(orden.Factura.Estado == "EMITIDA" ? "Emitida" : "Anulada")" />
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ---------------- Modales ---------------- *@
+        <DiagnosticoModal Visible="modalDiagnostico" OrdenId="orden.OrdenId" Diagnostico="diagnosticoEditar"
+                          OnCerrar="() => modalDiagnostico = false" OnGuardado="TrasModal" />
+        <SolicitarRepuestoModal Visible="modalSolicitud" OrdenId="orden.OrdenId" OnCerrar="() => modalSolicitud = false" OnGuardado="TrasModal" />
+
+        <Modal Visible="modalAsignar" Titulo="Asignar mecánico" Icono="bi-person-gear" OnCerrar="() => modalAsignar = false">
+            <div class="td-modal-cuerpo">
+                <p class="small text-sec">Seleccione al mecánico responsable de evaluar y reparar el vehículo.</p>
+                <div class="d-flex flex-column gap-2">
+                    @foreach (var m in mecanicos)
+                    {
+                        <button class="td-opcion @(mecanicoElegido == m.UsuarioId ? "activo" : "")" @onclick="() => mecanicoElegido = m.UsuarioId">
+                            <span class="td-avatar oscuro">@Ui.Iniciales(m.NombreCompleto)</span>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">@m.NombreCompleto @(m.UsuarioId == orden.MecanicoId ? "(actual)" : "")</div>
+                                <div class="small text-ter">@m.TrabajosActivos trabajo(s) en curso</div>
+                            </div>
+                            @if (mecanicoElegido == m.UsuarioId) { <i class="bi bi-check-circle-fill fs-5"></i> }
+                        </button>
+                    }
+                </div>
+            </div>
+            <div class="td-modal-pie">
+                <button class="btn btn-light" @onclick="() => modalAsignar = false">Cancelar</button>
+                <button class="btn btn-primary" disabled="@(mecanicoElegido is null || mecanicoElegido == orden.MecanicoId || ocupado)" @onclick="Asignar">Asignar</button>
+            </div>
+        </Modal>
+
+        <Modal Visible="estadoDestino is not null" Titulo="@(estadoDestino is null ? "" : Ui.AccionEstado(estadoDestino))" Icono="@(estadoDestino is null ? "" : Ui.IconoEstadoOrden(estadoDestino))" Tamano="sm" OnCerrar="() => estadoDestino = null">
+            <div class="td-modal-cuerpo">
+                <p class="small text-sec">La orden pasará a <b>@(estadoDestino is null ? "" : Ui.EstadoOrden(estadoDestino))</b>.</p>
+                <label class="form-label">Comentario</label>
+                <textarea class="form-control" rows="3" @bind="comentarioEstado" maxlength="300" placeholder="Opcional: avance, pruebas realizadas..."></textarea>
+            </div>
+            <div class="td-modal-pie">
+                <button class="btn btn-light" @onclick="() => estadoDestino = null">Cancelar</button>
+                <button class="btn btn-primary" disabled="@ocupado" @onclick="CambiarEstado">Confirmar</button>
+            </div>
+        </Modal>
+
+        <Modal Visible="modalSalida" Titulo="Entregar vehículo" Icono="bi-flag" Tamano="sm" OnCerrar="() => modalSalida = false">
+            <div class="td-modal-cuerpo">
+                <p class="small text-sec">Se registrará la salida del vehículo <b>@orden.Vehiculo.Placa</b> y la orden quedará cerrada.</p>
+                <label class="form-label">Observación de entrega</label>
+                <textarea class="form-control" rows="3" @bind="observacionSalida" maxlength="500" placeholder="Opcional"></textarea>
+            </div>
+            <div class="td-modal-pie">
+                <button class="btn btn-light" @onclick="() => modalSalida = false">Cancelar</button>
+                <button class="btn btn-dark" disabled="@ocupado" @onclick="RegistrarSalida"><i class="bi bi-flag"></i> Registrar salida</button>
+            </div>
+        </Modal>
+
+        <Modal Visible="modalEditar" Titulo="Editar datos de ingreso" Icono="bi-pencil" Tamano="lg" OnCerrar="() => modalEditar = false">
+            <EditForm Model="formEditar" OnValidSubmit="GuardarEdicion">
+                <DataAnnotationsValidator />
+                <div class="td-modal-cuerpo">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Kilometraje</label>
+                            <InputNumber class="form-control" @bind-Value="formEditar.Kilometraje" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Combustible</label>
+                            <InputSelect class="form-select" @bind-Value="formEditar.NivelCombustible">
+                                @foreach (var n in new[] { "Reserva", "1/4", "1/2", "3/4", "Lleno" }) { <option value="@n">@n</option> }
+                            </InputSelect>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Entrega estimada</label>
+                            <InputDate class="form-control" @bind-Value="formEditar.FechaEstimada" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Prioridad</label>
+                            <div class="td-combustible">
+                                @foreach (var p in new[] { "BAJA", "NORMAL", "ALTA", "URGENTE" })
+                                {
+                                    <button type="button" class="@(formEditar.Prioridad == p ? "activo" : "")" @onclick="() => formEditar.Prioridad = p">@Ui.Prioridad(p)</button>
+                                }
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Motivo de ingreso</label>
+                            <InputTextArea class="form-control" rows="3" @bind-Value="formEditar.MotivoIngreso" />
+                            <ValidationMessage For="() => formEditar.MotivoIngreso" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observaciones</label>
+                            <InputTextArea class="form-control" rows="2" @bind-Value="formEditar.Observaciones" />
+                        </div>
+                    </div>
+                </div>
+                <div class="td-modal-pie">
+                    <button type="button" class="btn btn-light" @onclick="() => modalEditar = false">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" disabled="@ocupado">Guardar cambios</button>
+                </div>
+            </EditForm>
+        </Modal>
+    }
+</Protegido>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private static readonly string[] Asignables = ["RECIBIDO", "EN_DIAGNOSTICO", "EN_REPARACION", "ESPERANDO_REPUESTOS"];
+    private static readonly string[] EnTaller = ["EN_DIAGNOSTICO", "EN_REPARACION", "ESPERANDO_REPUESTOS"];
+
+    private OrdenDetalleDto? orden;
+    private string tab = "diag";
+    private bool ocupado;
+    private bool menuMas;
+
+    private bool modalDiagnostico;
+    private DiagnosticoDto? diagnosticoEditar;
+    private bool modalSolicitud;
+    private bool modalAsignar;
+    private List<MecanicoDisponibleDto> mecanicos = [];
+    private int? mecanicoElegido;
+    private string? estadoDestino;
+    private string? comentarioEstado;
+    private bool modalSalida;
+    private string? observacionSalida;
+    private bool modalEditar;
+    private OrdenEditarRequest formEditar = new();
+
+    private bool EsResponsable => orden is not null && Sesion.Perfil is not null
+                                  && (Sesion.Perfil.EsAdministrador || orden.MecanicoId == Sesion.Perfil.UsuarioId);
+    private bool EsAsignable => orden is not null && Asignables.Contains(orden.Estado);
+    private bool EnTallerAhora => orden is not null && EnTaller.Contains(orden.Estado);
+    private bool PuedeDiagnosticar => EnTallerAhora && EsResponsable && Sesion.Puede(Modulos.Diagnosticos, Accion.Crear);
+    private bool PuedeSolicitar => EnTallerAhora && EsResponsable && Sesion.Puede(Modulos.Solicitudes, Accion.Crear)
+                                   && orden!.Diagnosticos.Count > 0;
+    /// <summary>Motivo por el que aún no se puede pasar al estado indicado (las mismas reglas que valida la API), o null.</summary>
+    private string? BloqueoEstado(string destino)
+    {
+        if (orden is null) return null;
+        if (orden.Diagnosticos.Count == 0)
+            return "Registre al menos un diagnóstico antes de avanzar la reparación.";
+        if (destino == "FINALIZADO" && orden.Solicitudes.Any(s => s.Estado == "PENDIENTE"))
+            return "Hay repuestos pendientes en bodega: espere el despacho o cancele la solicitud para finalizar.";
+        if (orden.Estado == "FINALIZADO" && orden.Factura?.Estado == "EMITIDA")
+            return "La orden ya fue facturada: anule la factura para reabrir la reparación.";
+        return null;
+    }
+
+    private string VolverA =>Sesion.Puede(Modulos.Ordenes) ? "ordenes" : "reparaciones";
+
+    protected override Task OnParametersSetAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        try
+        {
+            orden = await Ordenes.ObtenerAsync(Id);
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+            Navegacion.NavigateTo(VolverA);
+        }
+    }
+
+    private async Task Ejecutar(Func<Task> accion, string? exito = null)
+    {
+        ocupado = true;
+        try
+        {
+            await accion();
+            if (exito is not null) Notificaciones.Exito(exito);
+            await Cargar();
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+        }
+        finally
+        {
+            ocupado = false;
+        }
+    }
+
+    private async Task TrasModal()
+    {
+        modalDiagnostico = false;
+        modalSolicitud = false;
+        await Cargar();
+    }
+
+    private void AbrirDiagnostico(DiagnosticoDto? diagnostico)
+    {
+        diagnosticoEditar = diagnostico;
+        modalDiagnostico = true;
+    }
+
+    private async Task EliminarDiagnostico(DiagnosticoDto d)
+    {
+        if (await Dialogos.ConfirmarAsync("¿Eliminar diagnóstico?", d.FallaDetectada, "Eliminar", true))
+            await Ejecutar(() => Diagnosticos.EliminarAsync(d.DiagnosticoId), "Diagnóstico eliminado.");
+    }
+
+    private async Task CancelarSolicitud(SolicitudDto s)
+    {
+        if (await Dialogos.ConfirmarAsync("¿Cancelar solicitud?", $"{s.Cantidad} x {s.Repuesto}", "Cancelar solicitud", true))
+            await Ejecutar(() => Solicitudes.CancelarAsync(s.SolicitudId), "Solicitud cancelada.");
+    }
+
+    private async Task AbrirAsignacion()
+    {
+        try
+        {
+            mecanicos = await Ordenes.MecanicosAsync();
+            mecanicoElegido = orden!.MecanicoId;
+            modalAsignar = true;
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+    }
+
+    private async Task Asignar()
+    {
+        modalAsignar = false;
+        await Ejecutar(() => Ordenes.AsignarAsync(Id, mecanicoElegido!.Value), "Mecánico asignado.");
+    }
+
+    private void AbrirCambioEstado(string estado)
+    {
+        estadoDestino = estado;
+        comentarioEstado = null;
+    }
+
+    private async Task CambiarEstado()
+    {
+        var destino = estadoDestino!;
+        estadoDestino = null;
+        await Ejecutar(() => Reparaciones.CambiarEstadoAsync(Id, destino, comentarioEstado), $"Orden actualizada: {Ui.EstadoOrden(destino)}.");
+    }
+
+    private async Task RegistrarSalida()
+    {
+        modalSalida = false;
+        await Ejecutar(() => Ordenes.RegistrarSalidaAsync(Id, observacionSalida), "Vehículo entregado. ¡Orden cerrada!");
+    }
+
+    private void AbrirEdicion()
+    {
+        menuMas = false;
+        formEditar = new OrdenEditarRequest
+        {
+            Kilometraje = orden!.Kilometraje, NivelCombustible = orden.NivelCombustible, MotivoIngreso = orden.MotivoIngreso,
+            Observaciones = orden.Observaciones, Prioridad = orden.Prioridad, FechaEstimada = orden.FechaEstimada
+        };
+        modalEditar = true;
+    }
+
+    private async Task GuardarEdicion()
+    {
+        modalEditar = false;
+        await Ejecutar(() => Ordenes.ActualizarAsync(Id, formEditar), "Datos de la orden actualizados.");
+    }
+
+    private async Task Cancelar()
+    {
+        menuMas = false;
+        var motivo = await Dialogos.PedirMotivoAsync("Cancelar orden", $"La orden {orden!.NumeroOrden} se cerrará sin reparación.",
+            "Motivo de la cancelación", "Cancelar orden");
+        if (motivo is not null)
+            await Ejecutar(() => Ordenes.CancelarAsync(Id, motivo), "Orden cancelada.");
+    }
+}

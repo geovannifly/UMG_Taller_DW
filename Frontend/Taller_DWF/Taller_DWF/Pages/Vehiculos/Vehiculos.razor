@@ -1,0 +1,154 @@
+@page "/vehiculos"
+@inject VehiculosApi Api
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject DialogoService Dialogos
+@inject NavigationManager Navegacion
+
+<PageTitle>Vehículos · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Vehiculos">
+    <Encabezado Icono="bi-car-front" Titulo="Vehículos" Subtitulo="Flota registrada de los clientes del taller">
+        @if (Sesion.Puede(Modulos.Vehiculos, Accion.Crear))
+        {
+            <button class="btn btn-primary" @onclick="Nuevo"><i class="bi bi-plus-lg"></i> Nuevo vehículo</button>
+        }
+    </Encabezado>
+
+    <div class="td-card">
+        <div class="td-barra">
+            <div class="input-icono">
+                <i class="bi bi-search"></i>
+                <input class="form-control" placeholder="Buscar por placa, marca, modelo o propietario..."
+                       @bind="buscar" @bind:event="oninput" @bind:after="BuscarConPausa" />
+            </div>
+            <div class="form-check form-switch ms-auto mb-0">
+                <input class="form-check-input" type="checkbox" id="inactivos" @bind="incluirInactivos" @bind:after="Cargar" />
+                <label class="form-check-label small" for="inactivos">Mostrar inactivos</label>
+            </div>
+        </div>
+
+        @if (vehiculos is null)
+        {
+            <Cargando />
+        }
+        else if (vehiculos.Count == 0)
+        {
+            <EstadoVacio Icono="bi-car-front" Titulo="No hay vehículos que mostrar" />
+        }
+        else
+        {
+            <div class="td-tabla-contenedor">
+                <table class="td-tabla">
+                    <thead><tr><th>Placa</th><th>Vehículo</th><th>Propietario</th><th>Situación</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var v in vehiculos)
+                        {
+                            <tr class="clic @(v.Activo ? "" : "inactivo")" @onclick="@(() => Navegacion.NavigateTo($"vehiculos/{v.VehiculoId}"))">
+                                <td><span class="td-placa">@v.Placa</span></td>
+                                <td><div class="td-celda-principal">@v.Marca @v.Modelo</div><div class="td-celda-sub">@v.Anio · @(v.Color ?? "—")</div></td>
+                                <td>@v.Cliente</td>
+                                <td>
+                                    @if (!v.Activo) { <Insignia Clase="est-cancelado" Texto="Inactivo" /> }
+                                    else if (v.TieneOrdenActiva) { <Insignia Clase="est-reparacion" Texto="En taller" /> }
+                                    else { <Insignia Clase="est-recibido" Texto="Disponible" /> }
+                                </td>
+                                <td class="acciones" @onclick:stopPropagation="true">
+                                    @if (Sesion.Puede(Modulos.Ordenes, Accion.Crear) && v.Activo && !v.TieneOrdenActiva)
+                                    {
+                                        <a class="btn btn-light btn-sm" href="ordenes/nueva?vehiculo=@v.VehiculoId"><i class="bi bi-box-arrow-in-down"></i> Recibir</a>
+                                    }
+                                    @if (Sesion.Puede(Modulos.Vehiculos, Accion.Editar))
+                                    {
+                                        <button class="btn btn-ghost btn-icono" title="Editar" @onclick="() => Editar(v)"><i class="bi bi-pencil"></i></button>
+                                    }
+                                    @if (Sesion.Puede(Modulos.Vehiculos, Accion.Eliminar))
+                                    {
+                                        <button class="btn btn-ghost btn-icono" title="@(v.Activo ? "Desactivar" : "Activar")" @onclick="() => CambiarEstado(v)">
+                                            <i class="bi @(v.Activo ? "bi-toggle-on text-success" : "bi-toggle-off")"></i>
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</Protegido>
+
+<VehiculoFormModal Visible="modal" Vehiculo="seleccionado" OnCerrar="() => modal = false" OnGuardado="Guardado" />
+
+@code {
+    private List<VehiculoDto>? vehiculos;
+    private string? buscar;
+    private bool incluirInactivos;
+    private bool modal;
+    private VehiculoDto? seleccionado;
+    private CancellationTokenSource? pausa;
+
+    protected override Task OnInitializedAsync() => Cargar();
+
+    private async Task Cargar()
+    {
+        try
+        {
+            vehiculos = await Api.ListarAsync(buscar, null, incluirInactivos);
+        }
+        catch (ApiException ex)
+        {
+            vehiculos = [];
+            Notificaciones.Error(ex.Message);
+        }
+    }
+
+    private async Task BuscarConPausa()
+    {
+        pausa?.Cancel();
+        pausa = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, pausa.Token);
+            await Cargar();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private void Nuevo()
+    {
+        seleccionado = null;
+        modal = true;
+    }
+
+    private void Editar(VehiculoDto vehiculo)
+    {
+        seleccionado = vehiculo;
+        modal = true;
+    }
+
+    private async Task Guardado(VehiculoDto vehiculo)
+    {
+        modal = false;
+        await Cargar();
+    }
+
+    private async Task CambiarEstado(VehiculoDto vehiculo)
+    {
+        var accion = vehiculo.Activo ? "desactivar" : "activar";
+        if (!await Dialogos.ConfirmarAsync($"¿{char.ToUpper(accion[0])}{accion[1..]} vehículo?",
+                $"Se va a {accion} el vehículo {vehiculo.Placa}.", "Sí, " + accion, vehiculo.Activo))
+            return;
+
+        try
+        {
+            await Api.CambiarEstadoAsync(vehiculo.VehiculoId, !vehiculo.Activo);
+            Notificaciones.Exito($"Vehículo {(vehiculo.Activo ? "desactivado" : "activado")}.");
+            await Cargar();
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+        }
+    }
+}

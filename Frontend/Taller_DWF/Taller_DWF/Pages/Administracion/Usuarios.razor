@@ -1,0 +1,241 @@
+@page "/administracion/usuarios"
+@inject UsuariosApi Api
+@inject RolesApi Roles
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject DialogoService Dialogos
+
+<PageTitle>Usuarios · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Usuarios">
+    <Encabezado Icono="bi-person-gear" Titulo="Usuarios" Subtitulo="Personal con acceso al sistema y su rol">
+        @if (Sesion.Puede(Modulos.Usuarios, Accion.Crear))
+        {
+            <button class="btn btn-primary" @onclick="() => Abrir(null)"><i class="bi bi-person-plus"></i> Nuevo usuario</button>
+        }
+    </Encabezado>
+
+    <div class="td-card">
+        <div class="td-barra">
+            <div class="input-icono">
+                <i class="bi bi-search"></i>
+                <input class="form-control" placeholder="Nombre, usuario o correo..." @bind="buscar" @bind:event="oninput" />
+            </div>
+            <select class="form-select w-auto" @bind="rolFiltro">
+                <option value="0">Todos los roles</option>
+                @foreach (var r in roles) { <option value="@r.RolId">@r.Nombre</option> }
+            </select>
+        </div>
+
+        @if (usuarios is null)
+        {
+            <Cargando />
+        }
+        else
+        {
+            <div class="td-tabla-contenedor">
+                <table class="td-tabla">
+                    <thead><tr><th>Usuario</th><th>Rol</th><th>Contacto</th><th>Último acceso</th><th>Estado</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var u in Filtrados)
+                        {
+                            <tr class="@(u.Activo ? "" : "inactivo")">
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="td-avatar sm @(u.RolId == 1 ? "" : "oscuro")">@Ui.Iniciales(u.NombreCompleto)</span>
+                                        <div><div class="td-celda-principal">@u.NombreCompleto</div><div class="td-celda-sub">@@@u.NombreUsuario</div></div>
+                                    </div>
+                                </td>
+                                <td><Insignia Clase="@(u.RolId == 1 ? "est-reparacion" : "est-recibido")" Texto="@u.Rol" SinPunto="true" /></td>
+                                <td class="small"><div>@(u.Correo ?? "—")</div><div class="td-celda-sub">@u.Telefono</div></td>
+                                <td class="small">@(u.UltimoAcceso is null ? "Nunca" : Ui.TiempoTranscurrido(u.UltimoAcceso.Value))</td>
+                                <td><Insignia Clase="@(u.Activo ? "est-listo" : "est-cancelado")" Texto="@(u.Activo ? "Activo" : "Inactivo")" /></td>
+                                <td class="acciones">
+                                    @if (Sesion.Puede(Modulos.Usuarios, Accion.Editar))
+                                    {
+                                        <button class="btn btn-ghost btn-icono" title="Editar" @onclick="() => Abrir(u)"><i class="bi bi-pencil"></i></button>
+                                        <button class="btn btn-ghost btn-icono" title="Restablecer contraseña" @onclick="() => AbrirPassword(u)"><i class="bi bi-key"></i></button>
+                                    }
+                                    @if (Sesion.Puede(Modulos.Usuarios, Accion.Eliminar) && u.UsuarioId != Sesion.Perfil?.UsuarioId)
+                                    {
+                                        <button class="btn btn-ghost btn-icono" title="@(u.Activo ? "Desactivar" : "Activar")" @onclick="() => CambiarEstado(u)">
+                                            <i class="bi @(u.Activo ? "bi-toggle-on text-success" : "bi-toggle-off")"></i>
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <Modal Visible="modal" Titulo="@(editar is null ? "Nuevo usuario" : "Editar usuario")" Icono="bi-person-gear" Tamano="lg" OnCerrar="() => modal = false">
+        <EditForm Model="form" OnValidSubmit="Guardar">
+            <DataAnnotationsValidator />
+            <div class="td-modal-cuerpo">
+                <div class="row g-3">
+                    <div class="col-md-7">
+                        <label class="form-label">Nombre completo *</label>
+                        <InputText class="form-control" @bind-Value="form.NombreCompleto" />
+                        <ValidationMessage For="() => form.NombreCompleto" />
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">Usuario *</label>
+                        <InputText class="form-control text-lowercase" @bind-Value="form.NombreUsuario" />
+                        <ValidationMessage For="() => form.NombreUsuario" />
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label">Correo</label>
+                        <InputText class="form-control" @bind-Value="form.Correo" />
+                        <ValidationMessage For="() => form.Correo" />
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">Teléfono</label>
+                        <InputText class="form-control" @bind-Value="form.Telefono" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Rol *</label>
+                        <div class="row g-2">
+                            @foreach (var r in roles.Where(r => r.Activo))
+                            {
+                                <div class="col-sm-6">
+                                    <button type="button" class="td-opcion @(form.RolId == r.RolId ? "activo" : "")" @onclick="() => form.RolId = r.RolId"
+                                            disabled="@(editar?.UsuarioId == Sesion.Perfil?.UsuarioId && editar?.RolId != r.RolId)">
+                                        <i class="bi @(r.EsSistema ? "bi-shield-fill-check" : "bi-person-badge") fs-5"></i>
+                                        <div class="flex-grow-1"><div class="fw-semibold">@r.Nombre</div><div class="small text-ter">@r.Descripcion</div></div>
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                        <ValidationMessage For="() => form.RolId" />
+                    </div>
+                    @if (editar is null)
+                    {
+                        <div class="col-md-6">
+                            <label class="form-label">Contraseña inicial *</label>
+                            <InputText type="password" class="form-control" @bind-Value="form.Password" />
+                            <ValidationMessage For="() => form.Password" />
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="td-modal-pie">
+                <button type="button" class="btn btn-light" @onclick="() => modal = false">Cancelar</button>
+                <button type="submit" class="btn btn-primary" disabled="@ocupado">Guardar</button>
+            </div>
+        </EditForm>
+    </Modal>
+
+    <Modal Visible="usuarioPassword is not null" Titulo="Restablecer contraseña" Icono="bi-key" Tamano="sm" OnCerrar="() => usuarioPassword = null">
+        <div class="td-modal-cuerpo">
+            <p class="small text-sec">Nueva contraseña para <b>@usuarioPassword?.NombreCompleto</b>. Compártala de forma segura.</p>
+            <input type="password" class="form-control" @bind="nuevaPassword" @bind:event="oninput" placeholder="Mínimo 8 caracteres" />
+        </div>
+        <div class="td-modal-pie">
+            <button class="btn btn-light" @onclick="() => usuarioPassword = null">Cancelar</button>
+            <button class="btn btn-primary" disabled="@((nuevaPassword?.Length ?? 0) < 8 || ocupado)" @onclick="GuardarPassword">Restablecer</button>
+        </div>
+    </Modal>
+</Protegido>
+
+@code {
+    private List<UsuarioDto>? usuarios;
+    private List<RolDto> roles = [];
+    private string? buscar;
+    private int rolFiltro;
+    private bool modal;
+    private bool ocupado;
+    private UsuarioDto? editar;
+    private UsuarioGuardarRequest form = new();
+    private UsuarioDto? usuarioPassword;
+    private string? nuevaPassword;
+
+    private IEnumerable<UsuarioDto> Filtrados => (usuarios ?? [])
+        .Where(u => rolFiltro == 0 || u.RolId == rolFiltro)
+        .Where(u => string.IsNullOrWhiteSpace(buscar)
+                    || $"{u.NombreCompleto} {u.NombreUsuario} {u.Correo}".Contains(buscar.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var tareaRoles = Roles.ListarAsync();
+            usuarios = await Api.ListarAsync();
+            roles = await tareaRoles;
+        }
+        catch (ApiException ex)
+        {
+            usuarios ??= [];
+            Notificaciones.Error(ex.Message);
+        }
+    }
+
+    private async Task Recargar()
+    {
+        try { usuarios = await Api.ListarAsync(); }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+    }
+
+    private void Abrir(UsuarioDto? u)
+    {
+        editar = u;
+        form = u is null
+            ? new UsuarioGuardarRequest()
+            : new UsuarioGuardarRequest { NombreCompleto = u.NombreCompleto, NombreUsuario = u.NombreUsuario, Correo = u.Correo, Telefono = u.Telefono, RolId = u.RolId };
+        modal = true;
+    }
+
+    private async Task Guardar()
+    {
+        ocupado = true;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(form.Correo)) form.Correo = null;
+            if (editar is null) await Api.CrearAsync(form);
+            else await Api.ActualizarAsync(editar.UsuarioId, form);
+            Notificaciones.Exito("Usuario guardado.");
+            modal = false;
+            await Recargar();
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private void AbrirPassword(UsuarioDto u)
+    {
+        usuarioPassword = u;
+        nuevaPassword = null;
+    }
+
+    private async Task GuardarPassword()
+    {
+        ocupado = true;
+        try
+        {
+            await Api.RestablecerPasswordAsync(usuarioPassword!.UsuarioId, nuevaPassword!);
+            Notificaciones.Exito("Contraseña restablecida.");
+            usuarioPassword = null;
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private async Task CambiarEstado(UsuarioDto u)
+    {
+        var accion = u.Activo ? "desactivar" : "activar";
+        if (!await Dialogos.ConfirmarAsync($"¿Desea {accion} al usuario?",
+                u.Activo ? $"{u.NombreCompleto} perderá el acceso al sistema de inmediato." : $"{u.NombreCompleto} podrá volver a ingresar.",
+                "Sí, " + accion, u.Activo))
+            return;
+
+        try
+        {
+            await Api.CambiarEstadoAsync(u.UsuarioId, !u.Activo);
+            Notificaciones.Exito("Usuario actualizado.");
+            await Recargar();
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+    }
+}

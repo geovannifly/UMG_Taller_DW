@@ -1,0 +1,249 @@
+@page "/"
+@inject AuthApi Auth
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+
+<PageTitle>Inicio · Taller DW</PageTitle>
+
+<div class="td-hero">
+    <span class="rol"><i class="bi bi-person-badge"></i> @Sesion.Perfil?.Rol</span>
+    <h1>@Saludo, @PrimerNombre</h1>
+    <p>@Resumen</p>
+</div>
+
+@if (Accesos.Any())
+{
+    <div class="td-accesos mb-4">
+        @foreach (var (texto, icono, ruta) in Accesos)
+        {
+            <a class="td-acceso" href="@ruta"><i class="bi @icono"></i> @texto</a>
+        }
+    </div>
+}
+
+@if (datos is null)
+{
+    <Cargando Texto="Preparando su panel..." />
+}
+else
+{
+    <div class="row g-3 mb-4">
+        @if (datos.OrdenesActivas is not null)
+        {
+            <div class="col-6 col-xl-3"><Kpi Icono="bi-car-front" Etiqueta="Vehículos en taller" Valor="@datos.OrdenesActivas.ToString()" Variante="negro" Href="ordenes" Detalle="Órdenes abiertas" /></div>
+            <div class="col-6 col-xl-3"><Kpi Icono="bi-check2-circle" Etiqueta="Listos para entrega" Valor="@datos.ListasParaEntrega.ToString()" Href="ordenes?estado=FINALIZADO" /></div>
+            <div class="col-6 col-xl-3"><Kpi Icono="bi-flag" Etiqueta="Entregados hoy" Valor="@datos.EntregadasHoy.ToString()" /></div>
+        }
+        @if (datos.MisTrabajosActivos is not null)
+        {
+            <div class="col-6 col-xl-3"><Kpi Icono="bi-tools" Etiqueta="Mis trabajos activos" Valor="@datos.MisTrabajosActivos.ToString()" Variante="amarillo" Href="reparaciones" /></div>
+        }
+        @if (datos.SolicitudesPendientes is not null)
+        {
+            <div class="col-6 col-xl-3"><Kpi Icono="bi-hourglass-split" Etiqueta="Solicitudes pendientes" Valor="@datos.SolicitudesPendientes.ToString()"
+                                             Href="@(Sesion.Puede(Modulos.Despachos) ? "despachos" : "solicitudes")" Detalle="Repuestos por despachar" /></div>
+        }
+        @if (datos.RepuestosStockBajo is not null)
+        {
+            <div class="col-6 col-xl-3"><Kpi Icono="bi-exclamation-triangle" Etiqueta="Repuestos con stock bajo" Valor="@datos.RepuestosStockBajo.ToString()" Href="inventario?estado=BAJO" /></div>
+        }
+        @if (datos.FacturadoMes is not null)
+        {
+            <div class="col-6 col-xl-3"><Kpi Icono="bi-cash-stack" Etiqueta="Facturado este mes" Valor="@Ui.Moneda(datos.FacturadoMes)" Detalle="@($"{datos.FacturasMes} factura(s)")" Href="facturacion?tab=emitidas" /></div>
+            <div class="col-6 col-xl-3"><Kpi Icono="bi-receipt" Etiqueta="Órdenes por facturar" Valor="@datos.OrdenesPorFacturar.ToString()" Href="facturacion" /></div>
+        }
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-8">
+            @if (datos.MisTrabajos is { Count: > 0 })
+            {
+                <div class="td-card mb-3">
+                    <div class="td-card-cabecera">
+                        <h2><i class="bi bi-wrench-adjustable"></i> Mis trabajos</h2>
+                        <a href="reparaciones" class="btn btn-light btn-sm">Ver tablero</a>
+                    </div>
+                    <ul class="td-lista-simple">
+                        @foreach (var o in datos.MisTrabajos)
+                        {
+                            <li>
+                                <a href="ordenes/@o.OrdenId" class="d-flex align-items-center gap-3 w-100">
+                                    <span class="td-placa">@o.Placa</span>
+                                    <div class="flex-grow-1 min-w-0">
+                                        <div class="fw-semibold text-truncate">@o.Vehiculo</div>
+                                        <div class="small text-ter text-truncate">@o.NumeroOrden · @o.MotivoIngreso</div>
+                                    </div>
+                                    <Insignia Clase="@Ui.ClasePrioridad(o.Prioridad)" Texto="@Ui.Prioridad(o.Prioridad)" SinPunto="true" />
+                                    <EstadoOrden Estado="@o.Estado" />
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @if (datos.UltimasOrdenes is not null)
+            {
+                <div class="td-card">
+                    <div class="td-card-cabecera">
+                        <h2><i class="bi bi-clock-history"></i> Órdenes recientes</h2>
+                        <a href="ordenes" class="btn btn-light btn-sm">Ver todas</a>
+                    </div>
+                    @if (datos.UltimasOrdenes.Count == 0)
+                    {
+                        <EstadoVacio Icono="bi-clipboard" Titulo="Aún no hay órdenes" Mensaje="Las órdenes de trabajo aparecerán aquí cuando ingrese el primer vehículo." />
+                    }
+                    else
+                    {
+                        <div class="td-tabla-contenedor">
+                            <table class="td-tabla">
+                                <thead><tr><th>Orden</th><th>Vehículo</th><th>Cliente</th><th>Estado</th></tr></thead>
+                                <tbody>
+                                    @foreach (var o in datos.UltimasOrdenes)
+                                    {
+                                        <tr class="clic" @onclick="@(() => Navegacion.NavigateTo($"ordenes/{o.OrdenId}"))">
+                                            <td><div class="td-celda-principal">@o.NumeroOrden</div><div class="td-celda-sub">@Ui.TiempoTranscurrido(o.FechaIngreso)</div></td>
+                                            <td><span class="td-placa me-2">@o.Placa</span><span class="small">@o.Vehiculo</span></td>
+                                            <td>@o.Cliente</td>
+                                            <td><EstadoOrden Estado="@o.Estado" /></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (datos.UltimasOrdenes is null && datos.MisTrabajos is not { Count: > 0 })
+            {
+                <div class="td-card">
+                    <EstadoVacio Icono="bi-emoji-smile" Titulo="Todo en orden" Mensaje="No tiene tareas pendientes por ahora." />
+                </div>
+            }
+        </div>
+
+        <div class="col-lg-4">
+            @if (datos.OrdenesPorEstado is { Count: > 0 })
+            {
+                var total = datos.OrdenesPorEstado.Values.Sum();
+                <div class="td-card mb-3">
+                    <div class="td-card-cabecera"><h2><i class="bi bi-bar-chart"></i> Taller por etapa</h2></div>
+                    <div class="td-card-cuerpo">
+                        <div class="td-barra-estado mb-3">
+                            @foreach (var (estado, cantidad) in EstadosOrdenados)
+                            {
+                                <span style="width:@(cantidad * 100.0 / total)%;background:@ColorEstado(estado)" title="@Ui.EstadoOrden(estado): @cantidad"></span>
+                            }
+                        </div>
+                        <ul class="list-unstyled mb-0">
+                            @foreach (var (estado, cantidad) in EstadosOrdenados)
+                            {
+                                <li class="d-flex align-items-center justify-content-between py-1">
+                                    <span class="small"><i class="d-inline-block rounded me-2" style="width:10px;height:10px;background:@ColorEstado(estado)"></i>@Ui.EstadoOrden(estado)</span>
+                                    <a href="ordenes?estado=@estado" class="fw-bold tnum">@cantidad</a>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
+
+            @if (datos.AlertasStock is not null)
+            {
+                <div class="td-card">
+                    <div class="td-card-cabecera">
+                        <h2><i class="bi bi-box-seam"></i> Alertas de stock</h2>
+                        <a href="inventario?estado=BAJO" class="btn btn-light btn-sm">Inventario</a>
+                    </div>
+                    @if (datos.AlertasStock.Count == 0)
+                    {
+                        <EstadoVacio Icono="bi-check2-all" Titulo="Inventario saludable" Mensaje="Ningún repuesto está por debajo del mínimo." />
+                    }
+                    else
+                    {
+                        <ul class="td-lista-simple">
+                            @foreach (var r in datos.AlertasStock)
+                            {
+                                <li>
+                                    <div class="flex-grow-1 min-w-0">
+                                        <div class="fw-semibold text-truncate">@r.Nombre</div>
+                                        <div class="small text-ter">@r.Codigo · mínimo @r.StockMinimo</div>
+                                    </div>
+                                    <Insignia Clase="@Ui.ClaseStock(r.EstadoStock)" Texto="@($"{r.Disponible} disp.")" />
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Inject] private NavigationManager Navegacion { get; set; } = default!;
+
+    private DashboardDto? datos;
+
+    private string PrimerNombre => (Sesion.Perfil?.NombreCompleto ?? "").Split(' ')[0];
+
+    private static string Saludo => DateTime.Now.Hour switch
+    {
+        < 12 => "Buenos días",
+        < 19 => "Buenas tardes",
+        _ => "Buenas noches"
+    };
+
+    private string Resumen => datos switch
+    {
+        null => "Cargando la información del taller...",
+        { MisTrabajosActivos: > 0 } d => $"Tiene {d.MisTrabajosActivos} trabajo(s) asignado(s) en este momento.",
+        { SolicitudesPendientes: > 0 } d when Sesion.Puede(Modulos.Despachos) => $"Hay {d.SolicitudesPendientes} solicitud(es) de repuestos esperando despacho.",
+        { OrdenesActivas: > 0 } d => $"Hay {d.OrdenesActivas} vehículo(s) dentro del taller.",
+        _ => "Este es el resumen de la operación del taller."
+    };
+
+    private IEnumerable<(string Texto, string Icono, string Ruta)> Accesos
+    {
+        get
+        {
+            if (Sesion.Puede(Modulos.Ordenes, Accion.Crear)) yield return ("Recibir vehículo", "bi-box-arrow-in-down", "ordenes/nueva");
+            if (Sesion.Puede(Modulos.Clientes, Accion.Crear)) yield return ("Nuevo cliente", "bi-person-plus", "clientes?nuevo=1");
+            if (Sesion.Puede(Modulos.Reparaciones)) yield return ("Tablero de trabajos", "bi-kanban", "reparaciones");
+            if (Sesion.Puede(Modulos.Solicitudes, Accion.Crear)) yield return ("Mis solicitudes", "bi-cart-plus", "solicitudes");
+            if (Sesion.Puede(Modulos.Despachos)) yield return ("Despachar repuestos", "bi-truck", "despachos");
+            if (Sesion.Puede(Modulos.Inventario, Accion.Crear)) yield return ("Ingreso a bodega", "bi-box-arrow-in-right", "inventario");
+            if (Sesion.Puede(Modulos.Facturacion, Accion.Crear)) yield return ("Facturar", "bi-receipt", "facturacion");
+            if (Sesion.Puede(Modulos.Usuarios)) yield return ("Usuarios", "bi-person-gear", "administracion/usuarios");
+        }
+    }
+
+    private IEnumerable<(string Estado, int Cantidad)> EstadosOrdenados =>
+        new[] { "RECIBIDO", "EN_DIAGNOSTICO", "EN_REPARACION", "ESPERANDO_REPUESTOS", "FINALIZADO" }
+            .Where(e => datos?.OrdenesPorEstado?.ContainsKey(e) == true)
+            .Select(e => (e, datos!.OrdenesPorEstado![e]));
+
+    private static string ColorEstado(string estado) => estado switch
+    {
+        "RECIBIDO" => "#b8b8b2",
+        "EN_DIAGNOSTICO" => "#2f6fe4",
+        "EN_REPARACION" => "#ffc400",
+        "ESPERANDO_REPUESTOS" => "#ef7d16",
+        "FINALIZADO" => "#1f9d55",
+        _ => "#111"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            datos = await Auth.DashboardAsync();
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+            datos = new DashboardDto(null, null, null, null, null, null, null, null, null, null, null, null, null);
+        }
+    }
+}

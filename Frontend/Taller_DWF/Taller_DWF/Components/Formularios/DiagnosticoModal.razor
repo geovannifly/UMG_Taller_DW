@@ -1,0 +1,94 @@
+@inject DiagnosticosApi Api
+@inject NotificacionService Notificaciones
+
+<Modal Visible="Visible" Titulo="@(Diagnostico is null ? "Registrar diagnóstico" : "Editar diagnóstico")" Icono="bi-search" Tamano="lg" OnCerrar="OnCerrar">
+    <EditForm Model="form" OnValidSubmit="Guardar">
+        <DataAnnotationsValidator />
+        <div class="td-modal-cuerpo">
+            <div class="mb-3">
+                <label class="form-label">Falla detectada *</label>
+                <InputTextArea class="form-control" rows="3" @bind-Value="form.FallaDetectada"
+                               placeholder="Describa lo que encontró al evaluar el vehículo" />
+                <ValidationMessage For="() => form.FallaDetectada" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Reparación requerida *</label>
+                <InputTextArea class="form-control" rows="3" @bind-Value="form.ReparacionRequerida"
+                               placeholder="Trabajo a realizar para corregir la falla" />
+                <ValidationMessage For="() => form.ReparacionRequerida" />
+            </div>
+            <div class="row g-3">
+                <div class="col-md-7">
+                    <label class="form-label">Severidad</label>
+                    <div class="td-combustible">
+                        @foreach (var s in new[] { "BAJA", "MEDIA", "ALTA", "CRITICA" })
+                        {
+                            <button type="button" class="@(form.Severidad == s ? "activo" : "")" @onclick="() => form.Severidad = s">@Ui.Severidad(s)</button>
+                        }
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Costo de mano de obra (Q)</label>
+                    <InputNumber class="form-control" @bind-Value="form.CostoManoObra" step="0.01" />
+                    <ValidationMessage For="() => form.CostoManoObra" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Observaciones</label>
+                    <InputTextArea class="form-control" rows="2" @bind-Value="form.Observaciones" />
+                </div>
+            </div>
+        </div>
+        <div class="td-modal-pie">
+            <button type="button" class="btn btn-light" @onclick="OnCerrar">Cancelar</button>
+            <button type="submit" class="btn btn-primary" disabled="@guardando"><i class="bi bi-check2"></i> Guardar diagnóstico</button>
+        </div>
+    </EditForm>
+</Modal>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public int OrdenId { get; set; }
+    [Parameter] public DiagnosticoDto? Diagnostico { get; set; }
+    [Parameter] public EventCallback OnCerrar { get; set; }
+    [Parameter] public EventCallback OnGuardado { get; set; }
+
+    private DiagnosticoGuardarRequest form = new();
+    private bool guardando;
+    private bool visibleAnterior;
+
+    protected override void OnParametersSet()
+    {
+        if (Visible && !visibleAnterior)
+        {
+            form = Diagnostico is null
+                ? new DiagnosticoGuardarRequest { OrdenId = OrdenId }
+                : new DiagnosticoGuardarRequest
+                {
+                    OrdenId = OrdenId, FallaDetectada = Diagnostico.FallaDetectada, ReparacionRequerida = Diagnostico.ReparacionRequerida,
+                    Severidad = Diagnostico.Severidad, CostoManoObra = Diagnostico.CostoManoObra, Observaciones = Diagnostico.Observaciones
+                };
+        }
+        visibleAnterior = Visible;
+    }
+
+    private async Task Guardar()
+    {
+        guardando = true;
+        try
+        {
+            if (Diagnostico is null) await Api.CrearAsync(form);
+            else await Api.ActualizarAsync(Diagnostico.DiagnosticoId, form);
+
+            Notificaciones.Exito("Diagnóstico guardado.");
+            await OnGuardado.InvokeAsync();
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+}

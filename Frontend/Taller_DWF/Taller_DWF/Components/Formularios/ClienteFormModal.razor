@@ -1,0 +1,104 @@
+@inject ClientesApi Clientes
+@inject NotificacionService Notificaciones
+
+<Modal Visible="Visible" Titulo="@(Cliente is null ? "Nuevo cliente" : "Editar cliente")" Icono="bi-person-vcard" Tamano="lg" OnCerrar="OnCerrar">
+    <EditForm Model="form" OnValidSubmit="Guardar">
+        <DataAnnotationsValidator />
+        <div class="td-modal-cuerpo">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Nombres *</label>
+                    <InputText class="form-control" @bind-Value="form.Nombres" />
+                    <ValidationMessage For="() => form.Nombres" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Apellidos *</label>
+                    <InputText class="form-control" @bind-Value="form.Apellidos" />
+                    <ValidationMessage For="() => form.Apellidos" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Teléfono *</label>
+                    <InputText class="form-control" @bind-Value="form.Telefono" placeholder="5555-5555" />
+                    <ValidationMessage For="() => form.Telefono" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">NIT</label>
+                    <InputText class="form-control" @bind-Value="form.Nit" placeholder="CF" />
+                    <ValidationMessage For="() => form.Nit" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">DPI</label>
+                    <InputText class="form-control" @bind-Value="form.Dpi" placeholder="13 dígitos" maxlength="13" />
+                    <ValidationMessage For="() => form.Dpi" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Correo electrónico</label>
+                    <InputText class="form-control" @bind-Value="form.Correo" placeholder="cliente@correo.com" />
+                    <ValidationMessage For="() => form.Correo" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Dirección</label>
+                    <InputText class="form-control" @bind-Value="form.Direccion" />
+                </div>
+            </div>
+        </div>
+        <div class="td-modal-pie">
+            <button type="button" class="btn btn-light" @onclick="OnCerrar">Cancelar</button>
+            <button type="submit" class="btn btn-primary" disabled="@guardando">
+                <i class="bi bi-check2"></i> @(Cliente is null ? "Registrar cliente" : "Guardar cambios")
+            </button>
+        </div>
+    </EditForm>
+</Modal>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    /// <summary>Cliente a editar; null para registrar uno nuevo.</summary>
+    [Parameter] public ClienteDto? Cliente { get; set; }
+    [Parameter] public EventCallback OnCerrar { get; set; }
+    [Parameter] public EventCallback<ClienteDto> OnGuardado { get; set; }
+
+    private ClienteGuardarRequest form = new();
+    private bool guardando;
+    private bool visibleAnterior;
+
+    protected override void OnParametersSet()
+    {
+        if (Visible && !visibleAnterior)
+        {
+            form = Cliente is null
+                ? new ClienteGuardarRequest()
+                : new ClienteGuardarRequest
+                {
+                    Nombres = Cliente.Nombres, Apellidos = Cliente.Apellidos, Nit = Cliente.Nit, Dpi = Cliente.Dpi,
+                    Telefono = Cliente.Telefono, Correo = Cliente.Correo, Direccion = Cliente.Direccion
+                };
+        }
+        visibleAnterior = Visible;
+    }
+
+    private async Task Guardar()
+    {
+        guardando = true;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(form.Dpi)) form.Dpi = null;
+            if (string.IsNullOrWhiteSpace(form.Correo)) form.Correo = null;
+
+            var guardado = Cliente is null
+                ? await Clientes.CrearAsync(form)
+                : await Clientes.ActualizarAsync(Cliente.ClienteId, form);
+
+            Notificaciones.Exito(Cliente is null ? "Cliente registrado." : "Cliente actualizado.");
+            await OnGuardado.InvokeAsync(guardado);
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+}

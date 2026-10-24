@@ -1,0 +1,5 @@
+<span class="td-badge @Ui.ClaseEstadoOrden(Estado)">@Ui.EstadoOrden(Estado)</span>
+
+@code {
+    [Parameter, EditorRequired] public string Estado { get; set; } = string.Empty;
+}

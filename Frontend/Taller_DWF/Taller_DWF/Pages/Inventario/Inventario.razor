@@ -1,0 +1,486 @@
+@page "/inventario"
+@inject InventarioApi Api
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject DialogoService Dialogos
+
+<PageTitle>Inventario · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Inventario">
+    <Encabezado Icono="bi-box-seam" Titulo="Inventario de bodega" Subtitulo="Repuestos, existencias y movimientos de stock">
+        @if (tab == "rep" && Sesion.Puede(Modulos.Inventario, Accion.Crear))
+        {
+            <button class="btn btn-primary" @onclick="() => AbrirRepuesto(null)"><i class="bi bi-plus-lg"></i> Nuevo repuesto</button>
+        }
+        @if (tab == "cat" && Sesion.Puede(Modulos.Inventario, Accion.Crear))
+        {
+            <button class="btn btn-primary" @onclick="() => AbrirCategoria(null)"><i class="bi bi-plus-lg"></i> Nueva categoría</button>
+        }
+    </Encabezado>
+
+    @if (repuestos is not null)
+    {
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-lg-3"><Kpi Icono="bi-boxes" Etiqueta="Repuestos activos" Valor="@repuestos.Count(r => r.Activo).ToString()" Variante="negro" /></div>
+            <div class="col-6 col-lg-3"><Kpi Icono="bi-cash-coin" Etiqueta="Valor del inventario (costo)" Valor="@Ui.Moneda(repuestos.Where(r => r.Activo).Sum(r => r.PrecioCosto * r.Stock))" /></div>
+            <div class="col-6 col-lg-3"><Kpi Icono="bi-exclamation-triangle" Etiqueta="Stock bajo" Valor="@repuestos.Count(r => r.EstadoStock == "BAJO").ToString()" /></div>
+            <div class="col-6 col-lg-3"><Kpi Icono="bi-x-octagon" Etiqueta="Agotados" Valor="@repuestos.Count(r => r.EstadoStock == "AGOTADO").ToString()" /></div>
+        </div>
+    }
+
+    <div class="td-card">
+        <div class="td-tabs">
+            <button class="td-tab @(tab == "rep" ? "activo" : "")" @onclick="@(() => tab = "rep")"><i class="bi bi-box-seam"></i> Repuestos</button>
+            <button class="td-tab @(tab == "cat" ? "activo" : "")" @onclick="@(() => tab = "cat")"><i class="bi bi-tags"></i> Categorías</button>
+            <button class="td-tab @(tab == "mov" ? "activo" : "")" @onclick="AbrirMovimientos"><i class="bi bi-arrow-left-right"></i> Movimientos</button>
+        </div>
+
+        @if (tab == "rep")
+        {
+            <div class="td-barra">
+                <div class="input-icono">
+                    <i class="bi bi-search"></i>
+                    <input class="form-control" placeholder="Código, nombre, marca o ubicación..." @bind="buscar" @bind:event="oninput" />
+                </div>
+                <select class="form-select w-auto" @bind="categoriaId">
+                    <option value="0">Todas las categorías</option>
+                    @foreach (var c in categorias.Where(c => c.Activo)) { <option value="@c.CategoriaId">@c.Nombre</option> }
+                </select>
+                <select class="form-select w-auto" @bind="estadoStock">
+                    <option value="">Todo el stock</option>
+                    <option value="BAJO">Bajo o agotado</option>
+                    <option value="AGOTADO">Agotado</option>
+                </select>
+                <div class="form-check form-switch ms-auto mb-0">
+                    <input class="form-check-input" type="checkbox" id="inactivos" @bind="inactivos" @bind:after="CargarRepuestos" />
+                    <label class="form-check-label small" for="inactivos">Dados de baja</label>
+                </div>
+            </div>
+            @if (repuestos is null)
+            {
+                <Cargando />
+            }
+            else if (!RepuestosFiltrados.Any())
+            {
+                <EstadoVacio Icono="bi-box" Titulo="No hay repuestos que coincidan" />
+            }
+            else
+            {
+                <div class="td-tabla-contenedor">
+                    <table class="td-tabla">
+                        <thead><tr><th>Repuesto</th><th>Categoría</th><th>Ubicación</th><th class="text-end">Costo</th><th class="text-end">Venta</th><th>Existencia</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var r in RepuestosFiltrados)
+                            {
+                                <tr class="clic @(r.Activo ? "" : "inactivo")" @onclick="() => VerDetalle(r)">
+                                    <td><div class="td-celda-principal">@r.Nombre</div><div class="td-celda-sub"><span class="td-codigo">@r.Codigo</span> @r.Marca</div></td>
+                                    <td class="small">@r.Categoria</td>
+                                    <td class="small">@(r.Ubicacion ?? "—")</td>
+                                    <td class="text-end tnum small">@Ui.Moneda(r.PrecioCosto)</td>
+                                    <td class="text-end tnum fw-semibold">@Ui.Moneda(r.PrecioVenta)</td>
+                                    <td>
+                                        <BarraStock Stock="r.Stock" Disponible="r.Disponible" Minimo="r.StockMinimo" Estado="@r.EstadoStock" />
+                                        @if (r.Reservado > 0) { <div class="td-celda-sub">@r.Reservado reservado(s)</div> }
+                                    </td>
+                                    <td class="acciones" @onclick:stopPropagation="true">
+                                        @if (Sesion.Puede(Modulos.Inventario, Accion.Crear) && r.Activo)
+                                        {
+                                            <button class="btn btn-light btn-sm" title="Ingreso o ajuste de stock" @onclick="() => AbrirMovimiento(r)"><i class="bi bi-plus-slash-minus"></i> Stock</button>
+                                        }
+                                        @if (Sesion.Puede(Modulos.Inventario, Accion.Editar))
+                                        {
+                                            <button class="btn btn-ghost btn-icono" title="Editar" @onclick="() => AbrirRepuesto(r)"><i class="bi bi-pencil"></i></button>
+                                        }
+                                        @if (Sesion.Puede(Modulos.Inventario, Accion.Eliminar))
+                                        {
+                                            <button class="btn btn-ghost btn-icono" title="@(r.Activo ? "Dar de baja" : "Reactivar")" @onclick="() => EstadoRepuesto(r)">
+                                                <i class="bi @(r.Activo ? "bi-toggle-on text-success" : "bi-toggle-off")"></i>
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+        else if (tab == "cat")
+        {
+            <div class="td-tabla-contenedor">
+                <table class="td-tabla">
+                    <thead><tr><th>Categoría</th><th>Descripción</th><th class="text-center">Repuestos</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var c in categorias)
+                        {
+                            <tr class="@(c.Activo ? "" : "inactivo")">
+                                <td class="td-celda-principal">@c.Nombre</td>
+                                <td class="small text-sec">@c.Descripcion</td>
+                                <td class="text-center fw-bold">@c.CantidadRepuestos</td>
+                                <td class="acciones">
+                                    @if (Sesion.Puede(Modulos.Inventario, Accion.Editar))
+                                    {
+                                        <button class="btn btn-ghost btn-icono" title="Editar" @onclick="() => AbrirCategoria(c)"><i class="bi bi-pencil"></i></button>
+                                    }
+                                    @if (Sesion.Puede(Modulos.Inventario, Accion.Eliminar))
+                                    {
+                                        <button class="btn btn-ghost btn-icono" title="@(c.Activo ? "Desactivar" : "Activar")" @onclick="() => EstadoCategoria(c)">
+                                            <i class="bi @(c.Activo ? "bi-toggle-on text-success" : "bi-toggle-off")"></i>
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="td-barra">
+                <select class="form-select w-auto" @bind="tipoMovimiento" @bind:after="CargarMovimientos">
+                    <option value="">Todos los movimientos</option>
+                    <option value="ENTRADA">Entradas</option>
+                    <option value="SALIDA">Salidas (despachos)</option>
+                    <option value="AJUSTE">Ajustes</option>
+                </select>
+                <input type="date" class="form-control w-auto" @bind="desde" @bind:after="CargarMovimientos" />
+                <span class="text-ter">a</span>
+                <input type="date" class="form-control w-auto" @bind="hasta" @bind:after="CargarMovimientos" />
+            </div>
+            @if (movimientos is null)
+            {
+                <Cargando />
+            }
+            else if (movimientos.Count == 0)
+            {
+                <EstadoVacio Icono="bi-arrow-left-right" Titulo="Sin movimientos en el periodo" />
+            }
+            else
+            {
+                <TablaMovimientos Movimientos="movimientos" MostrarRepuesto="true" />
+            }
+        }
+    </div>
+
+    @* ---------- Repuesto ---------- *@
+    <Modal Visible="modalRepuesto" Titulo="@(repuestoEditar is null ? "Nuevo repuesto" : "Editar repuesto")" Icono="bi-box-seam" Tamano="lg" OnCerrar="() => modalRepuesto = false">
+        <EditForm Model="formRepuesto" OnValidSubmit="GuardarRepuesto">
+            <DataAnnotationsValidator />
+            <div class="td-modal-cuerpo">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Código *</label>
+                        <InputText class="form-control text-uppercase" @bind-Value="formRepuesto.Codigo" placeholder="FRE-PAS-001" />
+                        <ValidationMessage For="() => formRepuesto.Codigo" />
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Nombre *</label>
+                        <InputText class="form-control" @bind-Value="formRepuesto.Nombre" />
+                        <ValidationMessage For="() => formRepuesto.Nombre" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Categoría *</label>
+                        <InputSelect class="form-select" @bind-Value="formRepuesto.CategoriaId">
+                            <option value="0">Seleccione...</option>
+                            @foreach (var c in categorias.Where(c => c.Activo)) { <option value="@c.CategoriaId">@c.Nombre</option> }
+                        </InputSelect>
+                        <ValidationMessage For="() => formRepuesto.CategoriaId" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Marca</label>
+                        <InputText class="form-control" @bind-Value="formRepuesto.Marca" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Precio costo (Q)</label>
+                        <InputNumber class="form-control" @bind-Value="formRepuesto.PrecioCosto" step="0.01" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Precio venta (Q)</label>
+                        <InputNumber class="form-control" @bind-Value="formRepuesto.PrecioVenta" step="0.01" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Stock mínimo</label>
+                        <InputNumber class="form-control" @bind-Value="formRepuesto.StockMinimo" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Ubicación</label>
+                        <InputText class="form-control text-uppercase" @bind-Value="formRepuesto.Ubicacion" placeholder="A-01" />
+                    </div>
+                    @if (repuestoEditar is null)
+                    {
+                        <div class="col-md-4">
+                            <label class="form-label">Stock inicial</label>
+                            <InputNumber class="form-control" @bind-Value="formRepuesto.StockInicial" />
+                        </div>
+                    }
+                    <div class="col-12">
+                        <label class="form-label">Descripción</label>
+                        <InputTextArea class="form-control" rows="2" @bind-Value="formRepuesto.Descripcion" />
+                    </div>
+                </div>
+            </div>
+            <div class="td-modal-pie">
+                <button type="button" class="btn btn-light" @onclick="() => modalRepuesto = false">Cancelar</button>
+                <button type="submit" class="btn btn-primary" disabled="@ocupado"><i class="bi bi-check2"></i> Guardar</button>
+            </div>
+        </EditForm>
+    </Modal>
+
+    @* ---------- Movimiento de stock ---------- *@
+    <Modal Visible="repuestoMovimiento is not null" Titulo="Movimiento de stock" Icono="bi-plus-slash-minus" OnCerrar="() => repuestoMovimiento = null">
+        @if (repuestoMovimiento is not null)
+        {
+            <div class="td-modal-cuerpo">
+                <div class="td-opcion activo mb-3">
+                    <div class="flex-grow-1"><div class="fw-bold">@repuestoMovimiento.Nombre</div><div class="small text-sec"><span class="td-codigo">@repuestoMovimiento.Codigo</span></div></div>
+                    <div class="text-end"><div class="small text-ter">Stock actual</div><div class="fs-4 fw-800">@repuestoMovimiento.Stock</div></div>
+                </div>
+                <div class="td-segmento mb-3 w-100">
+                    <button class="flex-fill @(formMovimiento.Tipo == "ENTRADA" ? "activo" : "")" @onclick="@(() => formMovimiento.Tipo = "ENTRADA")"><i class="bi bi-box-arrow-in-down"></i> Entrada de mercadería</button>
+                    <button class="flex-fill @(formMovimiento.Tipo == "AJUSTE" ? "activo" : "")" @onclick="@(() => formMovimiento.Tipo = "AJUSTE")"><i class="bi bi-sliders"></i> Ajuste</button>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label">@(formMovimiento.Tipo == "ENTRADA" ? "Cantidad recibida" : "Cantidad (+ suma / − resta)")</label>
+                        <input type="number" class="form-control form-control-lg fw-bold" @bind="formMovimiento.Cantidad" @bind:event="oninput" />
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label">Referencia</label>
+                        <input class="form-control form-control-lg" @bind="formMovimiento.Referencia" placeholder="@(formMovimiento.Tipo == "ENTRADA" ? "No. de factura del proveedor" : "Conteo físico")" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Observación @(formMovimiento.Tipo == "AJUSTE" ? "*" : "")</label>
+                        <input class="form-control" @bind="formMovimiento.Observacion" maxlength="250" />
+                    </div>
+                </div>
+                <div class="td-consulta neutro mt-3">
+                    <i class="bi bi-arrow-right-circle"></i> Stock resultante: <b>@(repuestoMovimiento.Stock + formMovimiento.Cantidad)</b>
+                </div>
+            </div>
+            <div class="td-modal-pie">
+                <button class="btn btn-light" @onclick="() => repuestoMovimiento = null">Cancelar</button>
+                <button class="btn btn-primary" disabled="@ocupado" @onclick="GuardarMovimiento"><i class="bi bi-check2"></i> Registrar</button>
+            </div>
+        }
+    </Modal>
+
+    @* ---------- Detalle con kardex ---------- *@
+    <Modal Visible="detalle is not null" Titulo="@(detalle?.Repuesto.Nombre ?? "")" Icono="bi-card-list" Tamano="xl" OnCerrar="() => detalle = null">
+        @if (detalle is not null)
+        {
+            var r = detalle.Repuesto;
+            <div class="td-modal-cuerpo">
+                <div class="td-datos mb-4">
+                    <div class="td-dato"><div class="etq">Código</div><div class="val"><span class="td-codigo">@r.Codigo</span></div></div>
+                    <div class="td-dato"><div class="etq">Categoría</div><div class="val">@r.Categoria</div></div>
+                    <div class="td-dato"><div class="etq">Marca</div><div class="val">@(r.Marca ?? "—")</div></div>
+                    <div class="td-dato"><div class="etq">Ubicación</div><div class="val">@(r.Ubicacion ?? "—")</div></div>
+                    <div class="td-dato"><div class="etq">Stock / Reservado</div><div class="val">@r.Stock / @r.Reservado</div></div>
+                    <div class="td-dato"><div class="etq">Precio venta</div><div class="val">@Ui.Moneda(r.PrecioVenta)</div></div>
+                </div>
+                <div class="small-caps mb-2">Últimos movimientos (kardex)</div>
+                <div class="td-card"><TablaMovimientos Movimientos="detalle.UltimosMovimientos" /></div>
+            </div>
+        }
+    </Modal>
+
+    @* ---------- Categoría ---------- *@
+    <Modal Visible="modalCategoria" Titulo="@(categoriaEditar is null ? "Nueva categoría" : "Editar categoría")" Icono="bi-tags" Tamano="sm" OnCerrar="() => modalCategoria = false">
+        <EditForm Model="formCategoria" OnValidSubmit="GuardarCategoria">
+            <DataAnnotationsValidator />
+            <div class="td-modal-cuerpo">
+                <label class="form-label">Nombre *</label>
+                <InputText class="form-control mb-1" @bind-Value="formCategoria.Nombre" />
+                <ValidationMessage For="() => formCategoria.Nombre" />
+                <label class="form-label mt-3">Descripción</label>
+                <InputTextArea class="form-control" rows="2" @bind-Value="formCategoria.Descripcion" />
+            </div>
+            <div class="td-modal-pie">
+                <button type="button" class="btn btn-light" @onclick="() => modalCategoria = false">Cancelar</button>
+                <button type="submit" class="btn btn-primary" disabled="@ocupado">Guardar</button>
+            </div>
+        </EditForm>
+    </Modal>
+</Protegido>
+
+@code {
+    [SupplyParameterFromQuery(Name = "estado")] public string? EstadoInicial { get; set; }
+
+    private string tab = "rep";
+    private List<RepuestoDto>? repuestos;
+    private List<CategoriaDto> categorias = [];
+    private List<MovimientoDto>? movimientos;
+    private string? buscar;
+    private int categoriaId;
+    private string estadoStock = "";
+    private bool inactivos;
+    private string tipoMovimiento = "";
+    private DateTime? desde = DateTime.Today.AddDays(-30);
+    private DateTime? hasta = DateTime.Today;
+    private bool ocupado;
+
+    private bool modalRepuesto;
+    private RepuestoDto? repuestoEditar;
+    private RepuestoGuardarRequest formRepuesto = new();
+    private RepuestoDto? repuestoMovimiento;
+    private MovimientoCrearRequest formMovimiento = new();
+    private RepuestoDetalleDto? detalle;
+    private bool modalCategoria;
+    private CategoriaDto? categoriaEditar;
+    private CategoriaGuardarRequest formCategoria = new();
+
+    private IEnumerable<RepuestoDto> RepuestosFiltrados => (repuestos ?? [])
+        .Where(r => categoriaId == 0 || r.CategoriaId == categoriaId)
+        .Where(r => estadoStock == "" || r.EstadoStock == estadoStock || (estadoStock == "BAJO" && r.EstadoStock == "AGOTADO"))
+        .Where(r => string.IsNullOrWhiteSpace(buscar)
+                    || $"{r.Codigo} {r.Nombre} {r.Marca} {r.Ubicacion}".Contains(buscar.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (EstadoInicial is "BAJO" or "AGOTADO") estadoStock = EstadoInicial;
+        await Task.WhenAll(CargarRepuestos(), CargarCategorias());
+    }
+
+    private async Task CargarRepuestos()
+    {
+        try { repuestos = await Api.RepuestosAsync(incluirInactivos: inactivos); }
+        catch (ApiException ex) { repuestos = []; Notificaciones.Error(ex.Message); }
+    }
+
+    private async Task CargarCategorias()
+    {
+        try { categorias = await Api.CategoriasAsync(true); }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+    }
+
+    private async Task AbrirMovimientos()
+    {
+        tab = "mov";
+        await CargarMovimientos();
+    }
+
+    private async Task CargarMovimientos()
+    {
+        try { movimientos = await Api.MovimientosAsync(tipo: tipoMovimiento, desde: desde, hasta: hasta); }
+        catch (ApiException ex) { movimientos = []; Notificaciones.Error(ex.Message); }
+    }
+
+    private async Task Ejecutar(Func<Task> accion, string exito)
+    {
+        ocupado = true;
+        try
+        {
+            await accion();
+            Notificaciones.Exito(exito);
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+        }
+        finally
+        {
+            ocupado = false;
+        }
+    }
+
+    // ---------- Repuestos ----------
+
+    private void AbrirRepuesto(RepuestoDto? r)
+    {
+        repuestoEditar = r;
+        formRepuesto = r is null
+            ? new RepuestoGuardarRequest()
+            : new RepuestoGuardarRequest
+            {
+                Codigo = r.Codigo, Nombre = r.Nombre, Descripcion = r.Descripcion, CategoriaId = r.CategoriaId, Marca = r.Marca,
+                PrecioCosto = r.PrecioCosto, PrecioVenta = r.PrecioVenta, StockMinimo = r.StockMinimo, Ubicacion = r.Ubicacion
+            };
+        modalRepuesto = true;
+    }
+
+    private async Task GuardarRepuesto()
+    {
+        var ok = false;
+        await Ejecutar(async () =>
+        {
+            if (repuestoEditar is null) await Api.CrearRepuestoAsync(formRepuesto);
+            else await Api.ActualizarRepuestoAsync(repuestoEditar.RepuestoId, formRepuesto);
+            ok = true;
+        }, "Repuesto guardado.");
+
+        if (ok)
+        {
+            modalRepuesto = false;
+            await Task.WhenAll(CargarRepuestos(), CargarCategorias());
+        }
+    }
+
+    private async Task EstadoRepuesto(RepuestoDto r)
+    {
+        var accion = r.Activo ? "dar de baja" : "reactivar";
+        if (!await Dialogos.ConfirmarAsync($"¿Desea {accion} el repuesto?", $"{r.Codigo} - {r.Nombre}", "Sí, " + accion, r.Activo)) return;
+        await Ejecutar(() => Api.EstadoRepuestoAsync(r.RepuestoId, !r.Activo), "Repuesto actualizado.");
+        await CargarRepuestos();
+    }
+
+    private void AbrirMovimiento(RepuestoDto r)
+    {
+        formMovimiento = new MovimientoCrearRequest { Tipo = "ENTRADA", Cantidad = 1 };
+        repuestoMovimiento = r;
+    }
+
+    private async Task GuardarMovimiento()
+    {
+        var ok = false;
+        await Ejecutar(async () =>
+        {
+            var m = await Api.MovimientoAsync(repuestoMovimiento!.RepuestoId, formMovimiento);
+            ok = true;
+        }, "Movimiento registrado.");
+
+        if (ok)
+        {
+            repuestoMovimiento = null;
+            await CargarRepuestos();
+        }
+    }
+
+    private async Task VerDetalle(RepuestoDto r)
+    {
+        try { detalle = await Api.RepuestoAsync(r.RepuestoId); }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+    }
+
+    // ---------- Categorías ----------
+
+    private void AbrirCategoria(CategoriaDto? c)
+    {
+        categoriaEditar = c;
+        formCategoria = new CategoriaGuardarRequest { Nombre = c?.Nombre ?? "", Descripcion = c?.Descripcion };
+        modalCategoria = true;
+    }
+
+    private async Task GuardarCategoria()
+    {
+        var ok = false;
+        await Ejecutar(async () =>
+        {
+            if (categoriaEditar is null) await Api.CrearCategoriaAsync(formCategoria);
+            else await Api.ActualizarCategoriaAsync(categoriaEditar.CategoriaId, formCategoria);
+            ok = true;
+        }, "Categoría guardada.");
+
+        if (ok)
+        {
+            modalCategoria = false;
+            await CargarCategorias();
+        }
+    }
+
+    private async Task EstadoCategoria(CategoriaDto c)
+    {
+        await Ejecutar(() => Api.EstadoCategoriaAsync(c.CategoriaId, !c.Activo), "Categoría actualizada.");
+        await CargarCategorias();
+    }
+}

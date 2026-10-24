@@ -1,0 +1,30 @@
+<div class="td-flujo">
+    @for (var i = 0; i < Pasos.Length; i++)
+    {
+        var paso = Pasos[i];
+        var clase = i < indiceActual ? "hecho" : i == indiceActual ? "actual" : "";
+        <div class="td-flujo-paso @clase">
+            <div class="td-flujo-punto">
+                <i class="bi @(i < indiceActual ? "bi-check-lg" : Ui.IconoEstadoOrden(paso))"></i>
+            </div>
+            <div class="td-flujo-texto">@Ui.EstadoOrden(paso)</div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Estado { get; set; } = string.Empty;
+
+    private string[] Pasos = Ui.FlujoPrincipal;
+    private int indiceActual;
+
+    protected override void OnParametersSet()
+    {
+        // "Esperando repuestos" se muestra en el paso de reparación
+        Pasos = Estado == "ESPERANDO_REPUESTOS"
+            ? ["RECIBIDO", "EN_DIAGNOSTICO", "ESPERANDO_REPUESTOS", "FINALIZADO", "ENTREGADO"]
+            : Ui.FlujoPrincipal;
+        indiceActual = Array.IndexOf(Pasos, Estado);
+        if (Estado == "ENTREGADO") indiceActual = Pasos.Length; // todo completado
+    }
+}

@@ -1,0 +1,163 @@
+@page "/facturacion/nueva/{OrdenId:int}"
+@inject FacturasApi Api
+@inject NotificacionService Notificaciones
+@inject NavigationManager Navegacion
+
+<PageTitle>Nueva factura · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Facturacion" Accion="Accion.Crear">
+    @if (error is not null)
+    {
+        <Encabezado Icono="bi-receipt" Titulo="Nueva factura" Volver="facturacion" />
+        <div class="td-card"><EstadoVacio Icono="bi-exclamation-circle" Titulo="No se puede facturar esta orden" Mensaje="@error">
+            <a class="btn btn-dark" href="ordenes/@OrdenId">Ver la orden</a></EstadoVacio></div>
+    }
+    else if (pre is null)
+    {
+        <Cargando Texto="Calculando la factura..." />
+    }
+    else
+    {
+        <Encabezado Icono="bi-receipt" Titulo="Nueva factura" Subtitulo="@($"Orden {pre.NumeroOrden} · {pre.Vehiculo}")" Volver="facturacion" />
+
+        <div class="row g-3">
+            <div class="col-lg-7">
+                <div class="td-card">
+                    <div class="td-card-cabecera"><h2><i class="bi bi-list-ul"></i> Detalle a cobrar</h2><span class="td-placa">@pre.Placa</span></div>
+                    <div class="td-tabla-contenedor">
+                        <table class="td-tabla">
+                            <thead><tr><th>Descripción</th><th class="text-center">Cant.</th><th class="text-end">Precio</th><th class="text-end">Subtotal</th></tr></thead>
+                            <tbody>
+                                @foreach (var l in pre.Lineas)
+                                {
+                                    <tr>
+                                        <td>
+                                            <Insignia Clase="@(l.Tipo == "SERVICIO" ? "est-reparacion" : "est-diagnostico")" Texto="@(l.Tipo == "SERVICIO" ? "Servicio" : "Repuesto")" SinPunto="true" />
+                                            <div class="mt-1">@l.Descripcion</div>
+                                        </td>
+                                        <td class="text-center">@l.Cantidad</td>
+                                        <td class="text-end tnum">@Ui.Moneda(l.PrecioUnitario)</td>
+                                        <td class="text-end tnum fw-semibold">@Ui.Moneda(l.Subtotal)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (pre.Lineas.Count == 0)
+                    {
+                        <EstadoVacio Icono="bi-exclamation-circle" Titulo="La orden no tiene montos que cobrar" Mensaje="Registre el costo de mano de obra en los diagnósticos." />
+                    }
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="td-card">
+                    <div class="td-card-cabecera"><h2><i class="bi bi-person-vcard"></i> Datos de facturación</h2></div>
+                    <EditForm Model="form" OnValidSubmit="Emitir">
+                        <DataAnnotationsValidator />
+                        <div class="td-card-cuerpo">
+                            <div class="row g-3">
+                                <div class="col-5">
+                                    <label class="form-label">NIT *</label>
+                                    <InputText class="form-control text-uppercase" @bind-Value="form.NitCliente" />
+                                    <ValidationMessage For="() => form.NitCliente" />
+                                </div>
+                                <div class="col-7">
+                                    <label class="form-label">Nombre *</label>
+                                    <InputText class="form-control" @bind-Value="form.NombreCliente" />
+                                    <ValidationMessage For="() => form.NombreCliente" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Dirección</label>
+                                    <InputText class="form-control" @bind-Value="form.DireccionCliente" placeholder="Ciudad" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Método de pago</label>
+                                    <div class="td-combustible">
+                                        @foreach (var (m, icono) in new[] { ("EFECTIVO", "bi-cash"), ("TARJETA", "bi-credit-card"), ("TRANSFERENCIA", "bi-bank") })
+                                        {
+                                            <button type="button" class="@(form.MetodoPago == m ? "activo" : "")" @onclick="() => form.MetodoPago = m"><i class="bi @icono"></i> @Ui.MetodoPago(m)</button>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Descuento (Q) <span class="text-ter fw-normal">· máximo @pre.DescuentoMaximoPorcentaje% = @Ui.Moneda(DescuentoMaximo)</span></label>
+                                    <InputNumber class="form-control" @bind-Value="form.Descuento" step="0.01" />
+                                </div>
+                            </div>
+
+                            <div class="td-separador"></div>
+                            <div class="d-flex justify-content-between small mb-1"><span class="text-sec">Mano de obra</span><span class="tnum">@Ui.Moneda(pre.SubtotalManoObra)</span></div>
+                            <div class="d-flex justify-content-between small mb-1"><span class="text-sec">Repuestos</span><span class="tnum">@Ui.Moneda(pre.SubtotalRepuestos)</span></div>
+                            <div class="d-flex justify-content-between small mb-1"><span class="text-sec">Descuento</span><span class="tnum text-danger">− @Ui.Moneda(form.Descuento)</span></div>
+                            <div class="d-flex justify-content-between small mb-1 text-ter"><span>Base imponible</span><span class="tnum">@Ui.Moneda(BaseImponible)</span></div>
+                            <div class="d-flex justify-content-between small mb-2 text-ter"><span>IVA @pre.PorcentajeImpuesto% (incluido)</span><span class="tnum">@Ui.Moneda(Total - BaseImponible)</span></div>
+                            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                <span class="fw-bold">Total a pagar</span>
+                                <span class="fs-3 fw-800 tnum">@Ui.Moneda(Total)</span>
+                            </div>
+                            @if (form.Descuento > DescuentoMaximo)
+                            {
+                                <div class="td-consulta no mt-2 py-2 small"><i class="bi bi-exclamation-circle"></i> El descuento supera el máximo permitido.</div>
+                            }
+                        </div>
+                        <div class="td-modal-pie" style="border-radius:0 0 var(--td-radio) var(--td-radio)">
+                            <a class="btn btn-light" href="facturacion">Cancelar</a>
+                            <button type="submit" class="btn btn-primary" disabled="@(emitiendo || pre.Lineas.Count == 0 || form.Descuento > DescuentoMaximo || form.Descuento < 0)">
+                                <i class="bi bi-receipt"></i> Emitir factura
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    }
+</Protegido>
+
+@code {
+    [Parameter] public int OrdenId { get; set; }
+
+    private FacturaPreliminarDto? pre;
+    private readonly EmitirFacturaRequest form = new();
+    private string? error;
+    private bool emitiendo;
+
+    private decimal DescuentoMaximo => Math.Round((pre?.TotalBruto ?? 0) * (pre?.DescuentoMaximoPorcentaje ?? 0) / 100m, 2);
+    private decimal Total => (pre?.TotalBruto ?? 0) - Math.Round(form.Descuento, 2);
+    private decimal BaseImponible => Math.Round(Total / (1 + (pre?.PorcentajeImpuesto ?? 0) / 100m), 2);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            pre = await Api.PreliminarAsync(OrdenId);
+            form.OrdenId = OrdenId;
+            form.NitCliente = pre.NitCliente;
+            form.NombreCliente = pre.NombreCliente;
+            form.DireccionCliente = pre.DireccionCliente;
+        }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task Emitir()
+    {
+        emitiendo = true;
+        try
+        {
+            var factura = await Api.EmitirAsync(form);
+            Notificaciones.Exito($"Factura {factura.NumeroFactura} emitida por {Ui.Moneda(factura.Total)}.");
+            Navegacion.NavigateTo($"facturacion/{factura.FacturaId}");
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+        }
+        finally
+        {
+            emitiendo = false;
+        }
+    }
+}

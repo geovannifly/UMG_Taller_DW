@@ -1,0 +1,119 @@
+@inject VehiculosApi Vehiculos
+@inject ClientesApi Clientes
+@inject NotificacionService Notificaciones
+
+<Modal Visible="Visible" Titulo="@(Vehiculo is null ? "Nuevo vehículo" : "Editar vehículo")" Icono="bi-car-front" Tamano="lg" OnCerrar="OnCerrar">
+    <EditForm Model="form" OnValidSubmit="Guardar">
+        <DataAnnotationsValidator />
+        <div class="td-modal-cuerpo">
+            <div class="row g-3">
+                @if (ClienteIdFijo is null)
+                {
+                    <div class="col-12">
+                        <label class="form-label">Propietario *</label>
+                        <InputSelect class="form-select" @bind-Value="form.ClienteId">
+                            <option value="0">Seleccione un cliente...</option>
+                            @foreach (var c in clientes)
+                            {
+                                <option value="@c.ClienteId">@c.NombreCompleto · NIT @c.Nit</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="() => form.ClienteId" />
+                    </div>
+                }
+                <div class="col-md-4">
+                    <label class="form-label">Placa *</label>
+                    <InputText class="form-control text-uppercase fw-bold" @bind-Value="form.Placa" placeholder="P-123ABC" />
+                    <ValidationMessage For="() => form.Placa" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Marca *</label>
+                    <InputText class="form-control" @bind-Value="form.Marca" placeholder="Toyota" />
+                    <ValidationMessage For="() => form.Marca" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Modelo *</label>
+                    <InputText class="form-control" @bind-Value="form.Modelo" placeholder="Corolla" />
+                    <ValidationMessage For="() => form.Modelo" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Año *</label>
+                    <InputNumber class="form-control" @bind-Value="form.Anio" />
+                    <ValidationMessage For="() => form.Anio" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Color</label>
+                    <InputText class="form-control" @bind-Value="form.Color" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">VIN / Chasis</label>
+                    <InputText class="form-control text-uppercase" @bind-Value="form.Vin" />
+                </div>
+            </div>
+        </div>
+        <div class="td-modal-pie">
+            <button type="button" class="btn btn-light" @onclick="OnCerrar">Cancelar</button>
+            <button type="submit" class="btn btn-primary" disabled="@guardando">
+                <i class="bi bi-check2"></i> @(Vehiculo is null ? "Registrar vehículo" : "Guardar cambios")
+            </button>
+        </div>
+    </EditForm>
+</Modal>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public VehiculoDto? Vehiculo { get; set; }
+    /// <summary>Si se indica, el vehículo se registra a nombre de este cliente sin mostrar el selector.</summary>
+    [Parameter] public int? ClienteIdFijo { get; set; }
+    [Parameter] public EventCallback OnCerrar { get; set; }
+    [Parameter] public EventCallback<VehiculoDto> OnGuardado { get; set; }
+
+    private VehiculoGuardarRequest form = new();
+    private List<ClienteDto> clientes = [];
+    private bool guardando;
+    private bool visibleAnterior;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Visible && !visibleAnterior)
+        {
+            form = Vehiculo is null
+                ? new VehiculoGuardarRequest { ClienteId = ClienteIdFijo ?? 0 }
+                : new VehiculoGuardarRequest
+                {
+                    ClienteId = Vehiculo.ClienteId, Placa = Vehiculo.Placa, Marca = Vehiculo.Marca, Modelo = Vehiculo.Modelo,
+                    Anio = Vehiculo.Anio, Color = Vehiculo.Color, Vin = Vehiculo.Vin
+                };
+
+            visibleAnterior = true;
+            if (ClienteIdFijo is null)
+            {
+                try { clientes = await Clientes.ListarAsync(); }
+                catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+            }
+        }
+        visibleAnterior = Visible;
+    }
+
+    private async Task Guardar()
+    {
+        guardando = true;
+        try
+        {
+            var guardado = Vehiculo is null
+                ? await Vehiculos.CrearAsync(form)
+                : await Vehiculos.ActualizarAsync(Vehiculo.VehiculoId, form);
+
+            Notificaciones.Exito(Vehiculo is null ? $"Vehículo {guardado.Placa} registrado." : "Vehículo actualizado.");
+            await OnGuardado.InvokeAsync(guardado);
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+}

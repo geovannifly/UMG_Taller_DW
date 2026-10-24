@@ -1,0 +1,244 @@
+@page "/administracion/roles"
+@inject RolesApi Api
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject DialogoService Dialogos
+
+<PageTitle>Roles y permisos · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Roles">
+    <Encabezado Icono="bi-shield-lock" Titulo="Roles y permisos" Subtitulo="Defina qué puede ver y hacer cada rol en cada módulo">
+        @if (Sesion.Puede(Modulos.Roles, Accion.Crear))
+        {
+            <button class="btn btn-primary" @onclick="() => AbrirRol(null)"><i class="bi bi-plus-lg"></i> Nuevo rol</button>
+        }
+    </Encabezado>
+
+    <div class="row g-3">
+        <div class="col-lg-4">
+            <div class="td-card">
+                <div class="td-card-cabecera"><h2><i class="bi bi-people"></i> Roles</h2></div>
+                @if (roles is null)
+                {
+                    <Cargando />
+                }
+                else
+                {
+                    <div class="p-2 d-flex flex-column gap-2">
+                        @foreach (var r in roles)
+                        {
+                            <button class="td-opcion @(seleccionado?.Rol.RolId == r.RolId ? "activo" : "")" @onclick="() => Seleccionar(r.RolId)">
+                                <i class="bi @(r.EsSistema ? "bi-shield-fill-check" : "bi-person-badge") fs-5"></i>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-semibold">@r.Nombre @if (!r.Activo) { <span class="small text-danger">(inactivo)</span> }</div>
+                                    <div class="small text-ter">@r.CantidadUsuarios usuario(s)</div>
+                                </div>
+                                <i class="bi bi-chevron-right text-ter"></i>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            @if (seleccionado is null)
+            {
+                <div class="td-card"><EstadoVacio Icono="bi-hand-index" Titulo="Seleccione un rol" Mensaje="Verá su matriz de permisos por módulo." /></div>
+            }
+            else
+            {
+                var rol = seleccionado.Rol;
+                var editable = !rol.EsSistema && Sesion.Puede(Modulos.Roles, Accion.Editar);
+                <div class="td-card">
+                    <div class="td-card-cabecera">
+                        <div>
+                            <h2><i class="bi bi-shield-lock"></i> @rol.Nombre</h2>
+                            <div class="small text-ter">@rol.Descripcion</div>
+                        </div>
+                        <div class="d-flex gap-1">
+                            @if (Sesion.Puede(Modulos.Roles, Accion.Editar))
+                            {
+                                <button class="btn btn-light btn-sm" @onclick="() => AbrirRol(rol)"><i class="bi bi-pencil"></i> Editar</button>
+                            }
+                            @if (!rol.EsSistema && Sesion.Puede(Modulos.Roles, Accion.Eliminar))
+                            {
+                                <button class="btn btn-ghost btn-icono" title="Eliminar rol" @onclick="() => Eliminar(rol)"><i class="bi bi-trash"></i></button>
+                            }
+                        </div>
+                    </div>
+
+                    @if (rol.EsSistema)
+                    {
+                        <div class="td-consulta neutro m-3"><i class="bi bi-shield-fill-check"></i> El rol Administrador tiene acceso total al sistema y no puede modificarse.</div>
+                    }
+
+                    <div class="td-tabla-contenedor">
+                        <table class="td-tabla td-matriz">
+                            <thead><tr><th>Módulo</th><th>Ver</th><th>Crear</th><th>Editar</th><th>Eliminar</th></tr></thead>
+                            <tbody>
+                                @foreach (var grupo in permisos.GroupBy(p => p.Grupo))
+                                {
+                                    <tr><td colspan="5" class="small-caps" style="background:#fafaf8">@grupo.Key</td></tr>
+                                    @foreach (var p in grupo)
+                                    {
+                                        <tr>
+                                            <td><i class="bi @p.Icono text-ter me-2"></i><span class="fw-semibold">@p.Nombre</span></td>
+                                            <td><input type="checkbox" class="form-check-input" disabled="@(!editable)" checked="@p.Ver" @onchange="e => p.Ver = (bool)e.Value!" /></td>
+                                            <td><input type="checkbox" class="form-check-input" disabled="@(!editable)" checked="@p.Crear" @onchange="e => Marcar(p, () => p.Crear = (bool)e.Value!)" /></td>
+                                            <td><input type="checkbox" class="form-check-input" disabled="@(!editable)" checked="@p.Editar" @onchange="e => Marcar(p, () => p.Editar = (bool)e.Value!)" /></td>
+                                            <td><input type="checkbox" class="form-check-input" disabled="@(!editable)" checked="@p.Eliminar" @onchange="e => Marcar(p, () => p.Eliminar = (bool)e.Value!)" /></td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (editable)
+                    {
+                        <div class="td-modal-pie" style="border-radius:0 0 var(--td-radio) var(--td-radio)">
+                            <span class="me-auto small text-ter align-self-center">Marcar crear, editar o eliminar habilita también «Ver».</span>
+                            <button class="btn btn-light" @onclick="() => Seleccionar(rol.RolId)">Descartar</button>
+                            <button class="btn btn-primary" disabled="@ocupado" @onclick="GuardarPermisos"><i class="bi bi-check2"></i> Guardar permisos</button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <Modal Visible="modalRol" Titulo="@(rolEditar is null ? "Nuevo rol" : "Editar rol")" Icono="bi-shield-lock" Tamano="sm" OnCerrar="() => modalRol = false">
+        <EditForm Model="formRol" OnValidSubmit="GuardarRol">
+            <DataAnnotationsValidator />
+            <div class="td-modal-cuerpo">
+                <label class="form-label">Nombre *</label>
+                <InputText class="form-control" @bind-Value="formRol.Nombre" disabled="@(rolEditar?.EsSistema == true)" />
+                <ValidationMessage For="() => formRol.Nombre" />
+                <label class="form-label mt-3">Descripción</label>
+                <InputTextArea class="form-control" rows="2" @bind-Value="formRol.Descripcion" />
+                @if (rolEditar is not null && !rolEditar.EsSistema)
+                {
+                    <div class="form-check form-switch mt-3">
+                        <InputCheckbox class="form-check-input" id="rolActivo" @bind-Value="formRol.Activo" />
+                        <label class="form-check-label" for="rolActivo">Rol activo</label>
+                    </div>
+                }
+            </div>
+            <div class="td-modal-pie">
+                <button type="button" class="btn btn-light" @onclick="() => modalRol = false">Cancelar</button>
+                <button type="submit" class="btn btn-primary" disabled="@ocupado">Guardar</button>
+            </div>
+        </EditForm>
+    </Modal>
+</Protegido>
+
+@code {
+    private class FilaPermiso
+    {
+        public int ModuloId { get; init; }
+        public string Nombre { get; init; } = "";
+        public string Grupo { get; init; } = "";
+        public string Icono { get; init; } = "";
+        public bool Ver { get; set; }
+        public bool Crear { get; set; }
+        public bool Editar { get; set; }
+        public bool Eliminar { get; set; }
+    }
+
+    private List<RolDto>? roles;
+    private RolDetalleDto? seleccionado;
+    private List<FilaPermiso> permisos = [];
+    private bool ocupado;
+    private bool modalRol;
+    private RolDto? rolEditar;
+    private RolGuardarRequest formRol = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarRoles();
+        if (roles is { Count: > 1 }) await Seleccionar(roles[1].RolId);
+    }
+
+    private async Task CargarRoles()
+    {
+        try { roles = await Api.ListarAsync(); }
+        catch (ApiException ex) { roles = []; Notificaciones.Error(ex.Message); }
+    }
+
+    private async Task Seleccionar(int rolId)
+    {
+        try
+        {
+            seleccionado = await Api.ObtenerAsync(rolId);
+            permisos = seleccionado.Permisos.Select(p => new FilaPermiso
+            {
+                ModuloId = p.ModuloId, Nombre = p.Nombre, Grupo = p.Grupo, Icono = p.Icono,
+                Ver = p.Ver, Crear = p.Crear, Editar = p.Editar, Eliminar = p.Eliminar
+            }).ToList();
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+    }
+
+    private static void Marcar(FilaPermiso fila, Action cambio)
+    {
+        cambio();
+        if (fila.Crear || fila.Editar || fila.Eliminar) fila.Ver = true;
+    }
+
+    private async Task GuardarPermisos()
+    {
+        ocupado = true;
+        try
+        {
+            await Api.ActualizarPermisosAsync(seleccionado!.Rol.RolId, new ActualizarPermisosRequest
+            {
+                Permisos = permisos.Select(p => new PermisoRolItem
+                {
+                    ModuloId = p.ModuloId, Ver = p.Ver, Crear = p.Crear, Editar = p.Editar, Eliminar = p.Eliminar
+                }).ToList()
+            });
+            Notificaciones.Exito($"Permisos de «{seleccionado.Rol.Nombre}» actualizados. Se aplican de inmediato.");
+            await Seleccionar(seleccionado.Rol.RolId);
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private void AbrirRol(RolDto? rol)
+    {
+        rolEditar = rol;
+        formRol = new RolGuardarRequest { Nombre = rol?.Nombre ?? "", Descripcion = rol?.Descripcion, Activo = rol?.Activo ?? true };
+        modalRol = true;
+    }
+
+    private async Task GuardarRol()
+    {
+        ocupado = true;
+        try
+        {
+            var guardado = rolEditar is null
+                ? await Api.CrearAsync(formRol)
+                : await Api.ActualizarAsync(rolEditar.RolId, formRol);
+            Notificaciones.Exito(rolEditar is null ? "Rol creado. Ahora asigne sus permisos." : "Rol actualizado.");
+            modalRol = false;
+            await CargarRoles();
+            await Seleccionar(guardado.RolId);
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+        finally { ocupado = false; }
+    }
+
+    private async Task Eliminar(RolDto rol)
+    {
+        if (!await Dialogos.ConfirmarAsync("¿Eliminar rol?", $"Se eliminará el rol «{rol.Nombre}» y su configuración de permisos.", "Eliminar", true))
+            return;
+        try
+        {
+            await Api.EliminarAsync(rol.RolId);
+            Notificaciones.Exito("Rol eliminado.");
+            seleccionado = null;
+            await CargarRoles();
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+    }
+}

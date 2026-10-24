@@ -1,0 +1,200 @@
+@inject BodegaApi Bodega
+@inject SolicitudesApi Solicitudes
+@inject NotificacionService Notificaciones
+
+<Modal Visible="Visible" Titulo="Solicitar repuesto a bodega" Icono="bi-cart-plus" Tamano="lg" OnCerrar="OnCerrar">
+    <div class="td-modal-cuerpo">
+        @if (seleccionado is null)
+        {
+            <div class="input-icono mb-3">
+                <i class="bi bi-search"></i>
+                <input class="form-control" placeholder="Buscar repuesto por código, nombre o marca..."
+                       @bind="buscar" @bind:event="oninput" @bind:after="BuscarConPausa" />
+            </div>
+            @if (existencias is null)
+            {
+                <Cargando Texto="Consultando bodega..." />
+            }
+            else if (existencias.Count == 0)
+            {
+                <EstadoVacio Icono="bi-box" Titulo="Sin coincidencias en bodega" />
+            }
+            else
+            {
+                <div style="max-height:360px;overflow-y:auto" class="d-flex flex-column gap-2">
+                    @foreach (var r in existencias)
+                    {
+                        <button type="button" class="td-opcion" disabled="@(r.Disponible <= 0)" style="@(r.Disponible <= 0 ? "opacity:.55" : "")"
+                                @onclick="() => Seleccionar(r)">
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="fw-semibold text-truncate">@r.Nombre</div>
+                                <div class="small text-ter"><span class="td-codigo">@r.Codigo</span> · @r.Categoria @(r.Marca is null ? "" : $"· {r.Marca}")</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold">@Ui.Moneda(r.PrecioVenta)</div>
+                                <Insignia Clase="@Ui.ClaseStock(r.EstadoStock)" Texto="@($"{r.Disponible} disponible(s)")" />
+                            </div>
+                        </button>
+                    }
+                </div>
+            }
+        }
+        else
+        {
+            <div class="td-opcion activo mb-3">
+                <div class="td-avatar"><i class="bi bi-box-seam"></i></div>
+                <div class="flex-grow-1">
+                    <div class="fw-bold">@seleccionado.Nombre</div>
+                    <div class="small text-sec"><span class="td-codigo">@seleccionado.Codigo</span> · @Ui.Moneda(seleccionado.PrecioVenta) c/u</div>
+                </div>
+                <button type="button" class="btn btn-light btn-sm" @onclick="() => { seleccionado = null; consulta = null; }">Cambiar</button>
+            </div>
+
+            <div class="row g-3 align-items-end">
+                <div class="col-sm-4">
+                    <label class="form-label">Cantidad</label>
+                    <input type="number" min="1" class="form-control form-control-lg fw-bold" @bind="cantidad" @bind:event="oninput" @bind:after="ConsultarConPausa" />
+                </div>
+                <div class="col-sm-8">
+                    @if (consultando)
+                    {
+                        <div class="td-consulta neutro"><span class="spinner-border spinner-border-sm"></span> Verificando existencia en bodega...</div>
+                    }
+                    else if (consulta is not null)
+                    {
+                        <div class="td-consulta @(consulta.Suficiente ? "ok" : "no")">
+                            <i class="bi @(consulta.Suficiente ? "bi-check-circle-fill" : "bi-x-circle-fill") fs-5"></i>
+                            <div>
+                                <div class="fw-bold">@(consulta.Suficiente ? "Existencia confirmada" : "Existencia insuficiente")</div>
+                                <div class="small">Stock @consulta.Stock · Reservado @consulta.Reservado · Disponible @consulta.Disponible</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Observación para bodega</label>
+                    <input class="form-control" @bind="observacion" maxlength="250" placeholder="Opcional" />
+                </div>
+            </div>
+        }
+    </div>
+    <div class="td-modal-pie">
+        <button type="button" class="btn btn-light" @onclick="OnCerrar">Cancelar</button>
+        <button type="button" class="btn btn-primary" disabled="@(!PuedeEnviar)" @onclick="Enviar">
+            <i class="bi bi-send"></i> Enviar solicitud
+        </button>
+    </div>
+</Modal>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public int OrdenId { get; set; }
+    [Parameter] public EventCallback OnCerrar { get; set; }
+    [Parameter] public EventCallback OnGuardado { get; set; }
+
+    private List<ExistenciaDto>? existencias;
+    private ExistenciaDto? seleccionado;
+    private ConsultaExistenciaDto? consulta;
+    private string? buscar;
+    private string? observacion;
+    private int cantidad = 1;
+    private bool consultando;
+    private bool enviando;
+    private bool visibleAnterior;
+    private CancellationTokenSource? pausa;
+
+    private bool PuedeEnviar => seleccionado is not null && consulta is { Suficiente: true } && !consultando && !enviando
+                                && consulta.CantidadSolicitada == cantidad;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Visible && !visibleAnterior)
+        {
+            visibleAnterior = true;
+            seleccionado = null;
+            consulta = null;
+            buscar = null;
+            observacion = null;
+            cantidad = 1;
+            await CargarExistencias();
+        }
+        visibleAnterior = Visible;
+    }
+
+    private async Task CargarExistencias()
+    {
+        try { existencias = await Bodega.ExistenciasAsync(buscar); }
+        catch (ApiException ex) { existencias = []; Notificaciones.Error(ex.Message); }
+    }
+
+    private async Task BuscarConPausa()
+    {
+        pausa?.Cancel();
+        pausa = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, pausa.Token);
+            await CargarExistencias();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task Seleccionar(ExistenciaDto repuesto)
+    {
+        seleccionado = repuesto;
+        cantidad = 1;
+        await Consultar();
+    }
+
+    private async Task ConsultarConPausa()
+    {
+        pausa?.Cancel();
+        pausa = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(350, pausa.Token);
+            await Consultar();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    /// <summary>Consulta en tiempo real a la API de bodega antes de permitir la solicitud.</summary>
+    private async Task Consultar()
+    {
+        if (seleccionado is null || cantidad <= 0)
+        {
+            consulta = null;
+            return;
+        }
+
+        consultando = true;
+        try { consulta = await Bodega.ConsultarAsync(seleccionado.RepuestoId, cantidad); }
+        catch (ApiException ex) { consulta = null; Notificaciones.Error(ex.Message); }
+        finally { consultando = false; }
+    }
+
+    private async Task Enviar()
+    {
+        if (seleccionado is null) return;
+
+        enviando = true;
+        try
+        {
+            await Solicitudes.CrearAsync(new SolicitudCrearRequest
+            {
+                OrdenId = OrdenId, RepuestoId = seleccionado.RepuestoId, Cantidad = cantidad, Observacion = observacion
+            });
+            Notificaciones.Exito($"Solicitud enviada a bodega: {cantidad} x {seleccionado.Nombre}.");
+            await OnGuardado.InvokeAsync();
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+            await Consultar();
+        }
+        finally
+        {
+            enviando = false;
+        }
+    }
+}

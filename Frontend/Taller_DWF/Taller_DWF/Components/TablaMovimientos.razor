@@ -1,0 +1,30 @@
+<div class="td-tabla-contenedor">
+    <table class="td-tabla">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                @if (MostrarRepuesto) { <th>Repuesto</th> }
+                <th>Tipo</th><th class="text-end">Cantidad</th><th class="text-center">Stock</th><th>Referencia</th><th>Usuario</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var m in Movimientos)
+            {
+                <tr>
+                    <td class="small">@Ui.FechaHora(m.Fecha)</td>
+                    @if (MostrarRepuesto) { <td><div class="td-celda-principal">@m.Repuesto</div><div class="td-celda-sub"><span class="td-codigo">@m.CodigoRepuesto</span></div></td> }
+                    <td><Insignia Clase="@(m.Tipo switch { "ENTRADA" => "est-listo", "SALIDA" => "est-espera", _ => "est-diagnostico" })" Texto="@m.Tipo" SinPunto="true" /></td>
+                    <td class="text-end fw-bold tnum @(m.Cantidad < 0 ? "text-danger" : "text-success")">@(m.Cantidad > 0 ? "+" : "")@m.Cantidad</td>
+                    <td class="text-center small tnum text-sec">@m.StockAnterior → <b class="text-body">@m.StockNuevo</b></td>
+                    <td class="small">@(m.Referencia ?? "—")@if (m.Observacion is not null) { <div class="td-celda-sub">@m.Observacion</div> }</td>
+                    <td class="small">@m.Usuario</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<MovimientoDto> Movimientos { get; set; } = [];
+    [Parameter] public bool MostrarRepuesto { get; set; }
+}

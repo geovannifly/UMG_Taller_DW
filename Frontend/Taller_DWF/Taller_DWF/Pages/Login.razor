@@ -1,0 +1,122 @@
+@page "/login"
+@layout LayoutVacio
+@attribute [AllowAnonymous]
+@inject AuthApi Auth
+@inject SesionService Sesion
+@inject NavigationManager Navegacion
+
+<PageTitle>Iniciar sesión · Taller DW</PageTitle>
+
+<div class="td-login">
+    <section class="td-login-arte">
+        <div class="d-flex align-items-center gap-3">
+            <LogoTaller Tamano="46" />
+            <div class="td-marca-texto" style="font-size:1.15rem">TALLER <span>DW</span></div>
+        </div>
+
+        <div class="my-4">
+            <h1>Cada vehículo, <span>bajo control</span> de la entrada a la entrega.</h1>
+            <p class="mt-3 ocultar-movil">Recepción, diagnóstico, repuestos, reparación y facturación conectados en un mismo flujo de trabajo.</p>
+            <div class="td-login-rasgos mt-4 ocultar-movil">
+                <span><i class="bi bi-clipboard-check"></i> Órdenes de trabajo</span>
+                <span><i class="bi bi-tools"></i> Seguimiento de reparaciones</span>
+                <span><i class="bi bi-box-seam"></i> Existencias en bodega</span>
+                <span><i class="bi bi-receipt"></i> Facturación</span>
+            </div>
+        </div>
+
+        <div class="small ocultar-movil" style="color:#77777c">© @DateTime.Now.Year Taller DW · Servicio automotriz</div>
+    </section>
+
+    <section class="td-login-panel">
+        <div class="td-login-form">
+            <h2>Bienvenido</h2>
+            <p class="text-sec mb-4">Ingrese sus credenciales para continuar.</p>
+
+            @if (Expirada == "1" && error is null)
+            {
+                <div class="td-consulta neutro mb-3"><i class="bi bi-clock-history"></i> Su sesión expiró. Vuelva a iniciar sesión.</div>
+            }
+            @if (error is not null)
+            {
+                <div class="td-consulta no mb-3"><i class="bi bi-exclamation-circle"></i> @error</div>
+            }
+
+            <EditForm Model="form" OnValidSubmit="Ingresar">
+                <DataAnnotationsValidator />
+                <div class="mb-3">
+                    <label class="form-label">Usuario</label>
+                    <div class="input-icono">
+                        <i class="bi bi-person"></i>
+                        <InputText class="form-control" @bind-Value="form.NombreUsuario" autocomplete="username" placeholder="Su usuario" />
+                    </div>
+                    <ValidationMessage For="() => form.NombreUsuario" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Contraseña</label>
+                    <div class="input-icono position-relative">
+                        <i class="bi bi-lock"></i>
+                        <InputText type="@(verPassword ? "text" : "password")" class="form-control pe-5" @bind-Value="form.Password"
+                                   autocomplete="current-password" placeholder="••••••••" />
+                        <button type="button" class="btn btn-ghost btn-icono position-absolute end-0 top-50 translate-middle-y me-1"
+                                @onclick="() => verPassword = !verPassword" title="Mostrar u ocultar contraseña">
+                            <i class="bi @(verPassword ? "bi-eye-slash" : "bi-eye")"></i>
+                        </button>
+                    </div>
+                    <ValidationMessage For="() => form.Password" />
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg w-100" disabled="@cargando">
+                    @if (cargando)
+                    {
+                        <span class="spinner-border spinner-border-sm"></span>
+                        <span>Ingresando...</span>
+                    }
+                    else
+                    {
+                        <span>Ingresar</span>
+                        <i class="bi bi-arrow-right"></i>
+                    }
+                </button>
+            </EditForm>
+
+            <p class="small text-ter mt-4 mb-0 text-center">
+                <i class="bi bi-shield-lock"></i> Acceso exclusivo para personal autorizado.
+            </p>
+        </div>
+    </section>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? Volver { get; set; }
+    [SupplyParameterFromQuery] public string? Expirada { get; set; }
+
+    private readonly LoginRequest form = new();
+    private bool cargando;
+    private bool verPassword;
+    private string? error;
+
+    protected override void OnInitialized()
+    {
+        if (Sesion.Autenticado) Navegacion.NavigateTo("");
+    }
+
+    private async Task Ingresar()
+    {
+        cargando = true;
+        error = null;
+        try
+        {
+            var respuesta = await Auth.LoginAsync(form);
+            await Sesion.IniciarAsync(respuesta);
+            Navegacion.NavigateTo(string.IsNullOrWhiteSpace(Volver) ? "" : Volver);
+        }
+        catch (ApiException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+}

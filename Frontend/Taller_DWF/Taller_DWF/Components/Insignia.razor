@@ -1,0 +1,8 @@
+<span class="td-badge @Clase @(SinPunto ? "sin-punto" : "")">@if (Icono is not null){<i class="bi @Icono"></i>}@Texto</span>
+
+@code {
+    [Parameter] public string Clase { get; set; } = "est-recibido";
+    [Parameter] public string Texto { get; set; } = string.Empty;
+    [Parameter] public string? Icono { get; set; }
+    [Parameter] public bool SinPunto { get; set; }
+}

@@ -1,0 +1,19 @@
+@implements IDisposable
+@inject NotificacionService Notificaciones
+
+<div class="td-toasts" aria-live="polite">
+    @foreach (var n in Notificaciones.Activas)
+    {
+        <div class="td-toast @n.Tipo" @key="n.Id">
+            <i class="bi principal @(n.Tipo switch { "exito" => "bi-check-circle-fill", "error" => "bi-exclamation-octagon-fill", _ => "bi-info-circle-fill" })"></i>
+            <div>@n.Mensaje</div>
+            <button type="button" @onclick="() => Notificaciones.Cerrar(n.Id)" title="Cerrar"><i class="bi bi-x-lg"></i></button>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Notificaciones.Cambio += Refrescar;
+    private void Refrescar() => InvokeAsync(StateHasChanged);
+    public void Dispose() => Notificaciones.Cambio -= Refrescar;
+}

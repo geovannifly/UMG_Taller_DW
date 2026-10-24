@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111111" />
+    <title>Taller DW</title>
+    <base href="/" />
+    <link rel="preload" id="webassembly" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link href="Taller_DWF.styles.css" rel="stylesheet" />
+    <script type="importmap"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div class="td-arranque">
+            <div class="td-arranque-logo">
+                <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+                    <rect width="64" height="64" rx="16" fill="#FFC400" />
+                    <path d="M41.8 14.6a10.5 10.5 0 0 0-12.9 13.1L15.6 41a4.2 4.2 0 1 0 6 6l13.3-13.3a10.5 10.5 0 0 0 13.1-12.9l-6.4 6.4-5.3-1.4-1.4-5.3z" fill="#111" />
+                </svg>
+            </div>
+            <div class="td-arranque-texto">TALLER <span>DW</span></div>
+            <div class="td-arranque-barra"><span style="width: var(--blazor-load-percentage, 0%)"></span></div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        Ocurrió un error inesperado.
+        <a href="." class="reload">Recargar</a>
+        <span class="dismiss">✕</span>
+    </div>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+</body>
+
+</html>

@@ -1,0 +1,182 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject SesionService Sesion
+@inject NavigationManager Navegacion
+@inject AuthApi Auth
+@inject NotificacionService Notificaciones
+
+<div class="td-app">
+    <aside class="td-sidebar @(menuAbierto ? "abierto" : "")">
+        <a class="td-marca" href="">
+            <LogoTaller Tamano="40" />
+            <div>
+                <div class="td-marca-texto">TALLER <span>DW</span></div>
+                <div class="td-marca-sub">Servicio automotriz</div>
+            </div>
+        </a>
+
+        <nav class="td-nav" @onclick="CerrarMenu">
+            <NavLink href="" Match="NavLinkMatch.All"><i class="bi bi-grid-1x2"></i> Inicio</NavLink>
+            @foreach (var grupo in Menu)
+            {
+                <div class="td-nav-grupo">@grupo.Key</div>
+                @foreach (var modulo in grupo)
+                {
+                    <NavLink href="@Modulos.Ruta(modulo.Codigo)"><i class="bi @modulo.Icono"></i> @modulo.Nombre</NavLink>
+                }
+            }
+        </nav>
+
+        <div class="td-sidebar-pie">
+            <div class="td-usuario-mini">
+                <span class="td-avatar">@Ui.Iniciales(Sesion.Perfil?.NombreCompleto)</span>
+                <div class="text-truncate">
+                    <div class="nombre text-truncate">@Sesion.Perfil?.NombreCompleto</div>
+                    <div class="rol">@Sesion.Perfil?.Rol</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="td-fondo-menu @(menuAbierto ? "visible" : "")" @onclick="CerrarMenu"></div>
+
+    <div class="td-main">
+        <header class="td-topbar">
+            <button class="btn btn-light btn-icono td-hamburguesa" @onclick="() => menuAbierto = !menuAbierto" title="Menú">
+                <i class="bi bi-list fs-5"></i>
+            </button>
+            <div class="d-none d-md-flex align-items-center gap-2 text-sec small fw-semibold">
+                <i class="bi bi-calendar3"></i> @Hoy
+            </div>
+
+            <div class="ms-auto td-usuario-menu">
+                <button class="td-usuario-boton" @onclick="() => menuUsuario = !menuUsuario">
+                    <span class="td-avatar oscuro sm">@Ui.Iniciales(Sesion.Perfil?.NombreCompleto)</span>
+                    <span class="d-none d-sm-block text-start lh-sm">
+                        <span class="d-block fw-semibold small">@Sesion.Perfil?.NombreCompleto</span>
+                        <span class="d-block text-ter" style="font-size:.72rem">@Sesion.Perfil?.Rol</span>
+                    </span>
+                    <i class="bi bi-chevron-down small text-ter"></i>
+                </button>
+                @if (menuUsuario)
+                {
+                    <div class="position-fixed top-0 start-0 w-100 h-100" style="z-index:1049" @onclick="() => menuUsuario = false"></div>
+                    <div class="td-desplegable">
+                        <div class="px-2 py-2 mb-1 border-bottom">
+                            <div class="fw-bold">@Sesion.Perfil?.NombreCompleto</div>
+                            <div class="small text-ter">@@@Sesion.Perfil?.NombreUsuario · @Sesion.Perfil?.Rol</div>
+                        </div>
+                        <button @onclick="AbrirCambioPassword"><i class="bi bi-key"></i> Cambiar contraseña</button>
+                        <button @onclick="CerrarSesion" class="text-danger"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</button>
+                    </div>
+                }
+            </div>
+        </header>
+
+        <main class="td-contenido">
+            @Body
+        </main>
+    </div>
+</div>
+
+<Modal Visible="cambioPassword" Titulo="Cambiar contraseña" Icono="bi-key" Tamano="sm" OnCerrar="() => cambioPassword = false">
+    <EditForm Model="formPassword" OnValidSubmit="GuardarPassword">
+        <DataAnnotationsValidator />
+        <div class="td-modal-cuerpo">
+            <div class="mb-3">
+                <label class="form-label">Contraseña actual</label>
+                <InputText type="password" class="form-control" @bind-Value="formPassword.PasswordActual" />
+                <ValidationMessage For="() => formPassword.PasswordActual" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Nueva contraseña</label>
+                <InputText type="password" class="form-control" @bind-Value="formPassword.PasswordNueva" />
+                <ValidationMessage For="() => formPassword.PasswordNueva" />
+            </div>
+            <div>
+                <label class="form-label">Confirmar nueva contraseña</label>
+                <input type="password" class="form-control" @bind="confirmacion" />
+            </div>
+        </div>
+        <div class="td-modal-pie">
+            <button type="button" class="btn btn-light" @onclick="() => cambioPassword = false">Cancelar</button>
+            <button type="submit" class="btn btn-primary" disabled="@guardando">Guardar</button>
+        </div>
+    </EditForm>
+</Modal>
+
+<ToastHost />
+<DialogoHost />
+
+@code {
+    private bool menuAbierto;
+    private bool menuUsuario;
+    private bool cambioPassword;
+    private bool guardando;
+    private string? confirmacion;
+    private CambiarPasswordRequest formPassword = new();
+
+    private string Hoy
+    {
+        get
+        {
+            var texto = DateTime.Now.ToString("dddd, d 'de' MMMM 'de' yyyy");
+            return char.ToUpper(texto[0]) + texto[1..];
+        }
+    }
+
+    /// <summary>Módulos que el rol puede ver, agrupados como en la tabla Modulos.</summary>
+    private IEnumerable<IGrouping<string, PermisoMenuDto>> Menu =>
+        (Sesion.Perfil?.Permisos ?? [])
+            .Where(p => p.Ver && Modulos.Ruta(p.Codigo) is not null)
+            .OrderBy(p => p.Orden)
+            .GroupBy(p => p.Grupo);
+
+    protected override void OnInitialized() => Sesion.Cambio += Refrescar;
+
+    private void Refrescar() => InvokeAsync(StateHasChanged);
+
+    private void CerrarMenu() => menuAbierto = false;
+
+    private void AbrirCambioPassword()
+    {
+        menuUsuario = false;
+        formPassword = new();
+        confirmacion = null;
+        cambioPassword = true;
+    }
+
+    private async Task GuardarPassword()
+    {
+        if (formPassword.PasswordNueva != confirmacion)
+        {
+            Notificaciones.Error("La confirmación no coincide con la nueva contraseña.");
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            await Auth.CambiarPasswordAsync(formPassword);
+            cambioPassword = false;
+            Notificaciones.Exito("Contraseña actualizada correctamente.");
+        }
+        catch (ApiException ex)
+        {
+            Notificaciones.Error(ex.Message);
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private async Task CerrarSesion()
+    {
+        menuUsuario = false;
+        await Sesion.CerrarAsync();
+        Navegacion.NavigateTo("login");
+    }
+
+    public void Dispose() => Sesion.Cambio -= Refrescar;
+}

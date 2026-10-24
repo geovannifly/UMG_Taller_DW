@@ -1,0 +1,161 @@
+@page "/solicitudes"
+@inject SolicitudesApi Api
+@inject BodegaApi Bodega
+@inject SesionService Sesion
+@inject NotificacionService Notificaciones
+@inject DialogoService Dialogos
+
+<PageTitle>Solicitud de repuestos · Taller DW</PageTitle>
+
+<Protegido Modulos="@Modulos.Solicitudes">
+    <Encabezado Icono="bi-cart-plus" Titulo="Solicitud de repuestos" Subtitulo="Seguimiento de lo pedido a bodega y consulta de existencias en tiempo real" />
+
+    <div class="td-card">
+        <div class="td-tabs">
+            <button class="td-tab @(tab == "mias" ? "activo" : "")" @onclick="@(() => tab = "mias")"><i class="bi bi-list-check"></i> @(SoloMias ? "Mis solicitudes" : "Solicitudes") <span class="cuenta">@(solicitudes?.Count ?? 0)</span></button>
+            <button class="td-tab @(tab == "bodega" ? "activo" : "")" @onclick="AbrirBodega"><i class="bi bi-box-seam"></i> Existencias en bodega</button>
+        </div>
+
+        @if (tab == "mias")
+        {
+            <div class="td-barra">
+                <div class="td-chips">
+                    @foreach (var (clave, texto) in new[] { ("", "Todas"), ("PENDIENTE", "Pendientes"), ("DESPACHADO", "Despachadas"), ("RECHAZADO", "Rechazadas") })
+                    {
+                        <button class="td-chip @(filtro == clave ? "activo" : "")" @onclick="() => filtro = clave">@texto</button>
+                    }
+                </div>
+                <span class="ms-auto small text-ter">Para pedir un repuesto, ábralo desde la orden de trabajo.</span>
+            </div>
+            @if (solicitudes is null)
+            {
+                <Cargando />
+            }
+            else if (!Filtradas.Any())
+            {
+                <EstadoVacio Icono="bi-cart" Titulo="No hay solicitudes en esta vista" />
+            }
+            else
+            {
+                <div class="td-tabla-contenedor">
+                    <table class="td-tabla">
+                        <thead><tr><th>Repuesto</th><th>Orden</th><th class="text-center">Cant.</th><th>Estado</th><th>Respuesta</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var s in Filtradas)
+                            {
+                                <tr>
+                                    <td><div class="td-celda-principal">@s.Repuesto</div><div class="td-celda-sub"><span class="td-codigo">@s.CodigoRepuesto</span> · @Ui.FechaHora(s.FechaSolicitud)</div></td>
+                                    <td><a href="ordenes/@s.OrdenId" class="fw-semibold">@s.NumeroOrden</a><div><span class="td-placa">@s.Placa</span></div></td>
+                                    <td class="text-center fw-bold">@s.Cantidad</td>
+                                    <td><Insignia Clase="@Ui.ClaseSolicitud(s.Estado)" Texto="@Ui.Solicitud(s.Estado)" /></td>
+                                    <td class="small">
+                                        @if (s.Bodeguero is not null) { <div>@s.Bodeguero · @Ui.FechaHora(s.FechaRespuesta)</div> }
+                                        @if (s.MotivoRechazo is not null) { <div class="text-danger">@s.MotivoRechazo</div> }
+                                        @if (s.Bodeguero is null && s.MotivoRechazo is null) { <span class="text-ter">—</span> }
+                                    </td>
+                                    <td class="acciones">
+                                        @if (s.Estado == "PENDIENTE" && Sesion.Puede(Modulos.Solicitudes, Accion.Eliminar) && s.Solicitante == Sesion.Perfil?.NombreCompleto)
+                                        {
+                                            <button class="btn btn-ghost btn-icono" title="Cancelar" @onclick="() => Cancelar(s)"><i class="bi bi-x-lg"></i></button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="td-barra">
+                <div class="input-icono">
+                    <i class="bi bi-search"></i>
+                    <input class="form-control" placeholder="Código, nombre o marca del repuesto..." @bind="buscar" @bind:event="oninput" @bind:after="BuscarConPausa" />
+                </div>
+                <span class="ms-auto small text-ter"><i class="bi bi-broadcast"></i> Datos en tiempo real desde bodega</span>
+            </div>
+            @if (existencias is null)
+            {
+                <Cargando Texto="Consultando bodega..." />
+            }
+            else
+            {
+                <div class="td-tabla-contenedor">
+                    <table class="td-tabla">
+                        <thead><tr><th>Repuesto</th><th>Categoría</th><th>Ubicación</th><th>Existencia</th><th>Estado</th></tr></thead>
+                        <tbody>
+                            @foreach (var r in existencias)
+                            {
+                                <tr>
+                                    <td><div class="td-celda-principal">@r.Nombre</div><div class="td-celda-sub"><span class="td-codigo">@r.Codigo</span> @r.Marca</div></td>
+                                    <td class="small">@r.Categoria</td>
+                                    <td class="small">@(r.Ubicacion ?? "—")</td>
+                                    <td><BarraStock Stock="r.Stock" Disponible="r.Disponible" Minimo="r.StockMinimo" Estado="@r.EstadoStock" /></td>
+                                    <td><Insignia Clase="@Ui.ClaseStock(r.EstadoStock)" Texto="@Ui.EstadoStock(r.EstadoStock)" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    </div>
+</Protegido>
+
+@code {
+    private List<SolicitudDto>? solicitudes;
+    private List<ExistenciaDto>? existencias;
+    private string tab = "mias";
+    private string filtro = "";
+    private string? buscar;
+    private CancellationTokenSource? pausa;
+
+    // El administrador ve todas; el mecánico solo las suyas
+    private bool SoloMias => !(Sesion.Perfil?.EsAdministrador ?? false);
+
+    private IEnumerable<SolicitudDto> Filtradas => (solicitudes ?? []).Where(s => filtro == "" || s.Estado == filtro);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { solicitudes = await Api.ListarAsync(soloMias: SoloMias); }
+        catch (ApiException ex) { solicitudes = []; Notificaciones.Error(ex.Message); }
+    }
+
+    private async Task AbrirBodega()
+    {
+        tab = "bodega";
+        if (existencias is null) await CargarExistencias();
+    }
+
+    private async Task CargarExistencias()
+    {
+        try { existencias = await Bodega.ExistenciasAsync(buscar); }
+        catch (ApiException ex) { existencias = []; Notificaciones.Error(ex.Message); }
+    }
+
+    private async Task BuscarConPausa()
+    {
+        pausa?.Cancel();
+        pausa = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, pausa.Token);
+            await CargarExistencias();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task Cancelar(SolicitudDto s)
+    {
+        if (!await Dialogos.ConfirmarAsync("¿Cancelar solicitud?", $"{s.Cantidad} x {s.Repuesto} para {s.NumeroOrden}", "Cancelar solicitud", true))
+            return;
+        try
+        {
+            await Api.CancelarAsync(s.SolicitudId);
+            Notificaciones.Exito("Solicitud cancelada.");
+            solicitudes = await Api.ListarAsync(soloMias: SoloMias);
+        }
+        catch (ApiException ex) { Notificaciones.Error(ex.Message); }
+    }
+}
